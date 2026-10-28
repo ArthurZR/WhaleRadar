@@ -23,7 +23,7 @@ ARTE_BALEIA = r"""
 """.strip("\n")
 
 # Como cada regra de queda aparece escrita.
-NOMES_PERIODO = {"15min": "pior trecho de 15 min", "1h": "1h", "24h": "24h", "7d": "7 dias"}
+NOMES_PERIODO = {"15min": "maior queda em 15 min", "1h": "1h", "24h": "24h", "7d": "7 dias"}
 
 
 def formatar_numero(valor, casas=2):
@@ -69,10 +69,62 @@ def montar_resumo(config, mercado, precos_brl):
     return finalizar("\n".join(linhas))
 
 
-def montar_alerta(moeda, dados, preco_brl, indicadores, quedas):
+def _minutos(inicio, fim):
+    """Duração de um movimento brusco, em minutos (no mínimo 1)."""
+    return max(1, round((fim - inicio).total_seconds() / 60))
+
+
+def _quando(inicio, fim):
+    """O movimento brusco pode ter acontecido alguns minutos antes desta checagem."""
+    inicio = inicio.astimezone(FUSO_BRASILIA).strftime("%H:%M")
+    fim = fim.astimezone(FUSO_BRASILIA).strftime("%H:%M")
+    return f"Aconteceu entre {inicio} e {fim} (horário de Brasília)"
+
+
+def _linha_preco(dados, preco_brl):
+    texto = f"Preço agora: US$ {formatar_numero(dados['current_price'])}"
+    if preco_brl is not None:
+        texto += f" | R$ {formatar_numero(preco_brl)}"
+    return texto
+
+
+def _painel(indicadores, destacados, alta):
+    """Lista de variações; as que dispararam o alerta vão em negrito."""
+    linhas = []
+    for periodo, nome_periodo in NOMES_PERIODO.items():
+        valor = indicadores[periodo]
+        if periodo == "15min" and alta:
+            valor, nome_periodo = indicadores["alta_15min"], "maior alta em 15 min"
+        if valor is None:
+            continue
+        linha = f"• {nome_periodo}: {formatar_variacao(valor)}"
+        linhas.append(f"<b>{linha}</b>" if periodo in destacados else linha)
+
+    if not alta:
+        distancia = indicadores["distancia_maxima"]
+        linha = (
+            f"• {formatar_numero(abs(distancia), 1)}% abaixo da máxima de 7 dias"
+            f" (US$ {formatar_numero(indicadores['maxima_7d'])})"
+        )
+        linhas.append(f"<b>{linha}</b>" if "distancia_maxima" in destacados else linha)
+    return linhas
+
+
+def _bloco_termometro(termometro, emojis):
+    """Placar do termômetro de compra, com cada ponto explicado."""
+    linhas = [f"<b>Termômetro de compra: {termometro['pontos']}/{termometro['total']}</b>"]
+    for ok, texto in termometro["itens"]:
+        linhas.append(f"{'✅' if ok else '❌'} {escape(texto, quote=False)}")
+    emoji = emojis["zona_interesse"] if termometro["interesse"] else emojis["sem_sinal"]
+    linhas.append(f"{emoji} <b>Leitura:</b> {escape(termometro['leitura'], quote=False)}")
+    return linhas
+
+
+def montar_alerta(moeda, dados, preco_brl, indicadores, quedas, termometro, emojis):
     """Mensagem de alerta de queda para uma moeda.
 
     quedas: regras que dispararam, a mais forte primeiro (ex.: ["24h", "1h"]).
+    termometro: resultado do termometro.py, ou None se não deu para calcular.
     """
     nome = f"{moeda['emoji']} {moeda['simbolo']}"
 
@@ -83,41 +135,51 @@ def montar_alerta(moeda, dados, preco_brl, indicadores, quedas):
         titulo = f"🔻 {nome} está {queda}% abaixo da máxima dos últimos 7 dias"
     elif principal == "15min":
         queda = formatar_numero(abs(indicadores["15min"]), 1)
-        minutos = 15
-        if indicadores["brusca_inicio"]:
-            duracao = indicadores["brusca_fim"] - indicadores["brusca_inicio"]
-            minutos = max(1, round(duracao.total_seconds() / 60))
+        minutos = _minutos(indicadores["brusca_inicio"], indicadores["brusca_fim"])
         titulo = f"⚡ {nome} despencou {queda}% em {minutos} min"
     else:
         queda = formatar_numero(abs(indicadores[principal]), 1)
         titulo = f"🔻 {nome} caiu {queda}% em {NOMES_PERIODO[principal]}"
 
-    preco = f"Preço agora: US$ {formatar_numero(dados['current_price'])}"
-    if preco_brl is not None:
-        preco += f" | R$ {formatar_numero(preco_brl)}"
+    linhas = [f"<b>{titulo}</b>"]
+    if "15min" in quedas:
+        linhas.append(_quando(indicadores["brusca_inicio"], indicadores["brusca_fim"]))
+    linhas += [_linha_preco(dados, preco_brl), "", "Variação:", *_painel(indicadores, quedas, alta=False)]
 
-    # Painel com todas as variações; as que dispararam o alerta vão em negrito.
-    painel = []
-    for periodo, nome_periodo in NOMES_PERIODO.items():
-        valor = indicadores[periodo]
-        if valor is None:
-            continue
-        linha = f"• {nome_periodo}: {formatar_variacao(valor)}"
-        painel.append(f"<b>{linha}</b>" if periodo in quedas else linha)
+    linhas.append("")
+    if termometro:
+        linhas += _bloco_termometro(termometro, emojis)
+    else:
+        linhas.append(f"{emojis['sem_sinal']} Termômetro de compra indisponível agora (falha ao buscar dados).")
 
-    distancia = indicadores["distancia_maxima"]
-    linha = (
-        f"• {formatar_numero(abs(distancia), 1)}% abaixo da máxima de 7 dias"
-        f" (US$ {formatar_numero(indicadores['maxima_7d'])})"
-    )
-    painel.append(f"<b>{linha}</b>" if "distancia_maxima" in quedas else linha)
+    return finalizar("\n".join(linhas))
 
-    cabecalho = [f"<b>{titulo}</b>"]
-    if "15min" in quedas and indicadores["brusca_inicio"]:
-        # A queda brusca pode ter acontecido alguns minutos antes desta checagem.
-        inicio = indicadores["brusca_inicio"].astimezone(FUSO_BRASILIA).strftime("%H:%M")
-        fim = indicadores["brusca_fim"].astimezone(FUSO_BRASILIA).strftime("%H:%M")
-        cabecalho.append(f"Aconteceu entre {inicio} e {fim} (horário de Brasília)")
 
-    texto = "\n".join([*cabecalho, preco, "", "Variação:", *painel])
-    return finalizar(texto)
+def montar_alerta_alta(moeda, dados, preco_brl, indicadores, altas):
+    """Mensagem de alerta de alta forte (sem termômetro de compra).
+
+    altas: regras que dispararam, a mais forte primeiro (ex.: ["24h", "1h"]).
+    """
+    nome = f"{moeda['emoji']} {moeda['simbolo']}"
+
+    principal = altas[0]
+    if principal == "15min":
+        alta = formatar_numero(indicadores["alta_15min"], 1)
+        minutos = _minutos(indicadores["alta_brusca_inicio"], indicadores["alta_brusca_fim"])
+        titulo = f"⚡🚀 {nome} disparou {alta}% em {minutos} min"
+    else:
+        alta = formatar_numero(indicadores[principal], 1)
+        titulo = f"🚀 {nome} subiu {alta}% em {NOMES_PERIODO[principal]}"
+
+    linhas = [f"<b>{titulo}</b>"]
+    if "15min" in altas:
+        linhas.append(_quando(indicadores["alta_brusca_inicio"], indicadores["alta_brusca_fim"]))
+    linhas += [
+        _linha_preco(dados, preco_brl),
+        "",
+        "Variação:",
+        *_painel(indicadores, altas, alta=True),
+        "",
+        "Alta bem mais forte que o normal. Movimentos assim às vezes devolvem parte do ganho logo depois.",
+    ]
+    return finalizar("\n".join(linhas))

@@ -8,14 +8,17 @@ moedas:
     simbolo: BTC
     coinbase: BTC-USD   # nome na Coinbase (preço minuto a minuto, para quedas bruscas)
     emoji: "🪙"
+    perfil: longo_prazo   # comprar e segurar (veja "termometro" lá embaixo)
   - id: ethereum
     simbolo: ETH
     coinbase: ETH-USD
     emoji: "🔷"
+    perfil: longo_prazo   # segurar, comprando mais em quedas fortes
   - id: solana
     simbolo: SOL
     coinbase: SOL-USD
     emoji: "🟣"
+    perfil: curto_prazo   # comprar e vender
 
 # Quando avisar (perfil "alertas mais frequentes").
 # Basta UMA destas condições acontecer para a moeda gerar alerta.
@@ -27,13 +30,22 @@ limites_queda:
   "7d": -10     # caiu 10% ou mais nos últimos 7 dias
   "distancia_maxima": -10   # está 10% ou mais abaixo do preço mais alto dos últimos 7 dias
 
+# Altas mais fortes que o normal (avisos com 🚀, sem termômetro de compra).
+# Números positivos porque são altas.
+limites_alta:
+  "15min": 2    # alta brusca: subiu 2% ou mais em até 15 minutos
+  "1h": 3       # subiu 3% ou mais na última hora
+  "24h": 6      # subiu 6% ou mais nas últimas 24 horas
+  "7d": 15      # subiu 15% ou mais nos últimos 7 dias
+
 # Anti-spam: evita que a mesma moeda fique avisando sem parar.
 anti_spam:
   # Depois de um alerta, a mesma moeda fica em silêncio por pelo menos este tempo.
   intervalo_horas: 4
   # Passado esse tempo, só avisa de novo se o preço caiu MAIS este tanto (%)
-  # desde o último alerta. Assim não chega o mesmo aviso repetido quando o preço
-  # fica parado lá embaixo.
+  # desde o último alerta (ou subiu mais, no caso dos avisos de alta). Assim não
+  # chega o mesmo aviso repetido quando o preço fica parado.
+  # Quedas e altas têm memórias separadas.
   nova_queda_minima: 2
   # Depois deste tempo, a memória "zera" e qualquer queda nova volta a avisar.
   esquecer_apos_horas: 24
@@ -42,8 +54,31 @@ anti_spam:
   # último alerta e já tenham passado pelo menos estes minutos.
   intervalo_brusca_minutos: 30
 
+# Termômetro de compra (vai junto com os alertas de queda).
+# Cada critério cumprido vale 1 ponto (de 0 a 5). Com "pontos_para_interesse"
+# ou mais, a leitura vira 🎯 "possível zona de compra"; abaixo disso, ⚠️.
+# RSI: medidor de 0 a 100 de quão rápido o preço se moveu; abaixo de 30–35
+# quer dizer que caiu rápido demais ("sobrevendido").
+termometro:
+  # Comprar e segurar: olha se está barato em meses e anos.
+  longo_prazo:
+    pontos_para_interesse: 3
+    dias_media: 200              # 1) preço abaixo da média dos últimos 200 dias
+    queda_da_maxima_anual: -20   # 2) 20% ou mais abaixo da máxima do último ano
+    medo_maximo: 40              # 3) índice de medo e ganância em 40 ou menos
+    rsi_diario_maximo: 35        # 4) RSI diário abaixo de 35
+    horas_sem_nova_minima: 6     # 5) não fez nova mínima nas últimas 6 horas
+  # Comprar e vender: olha se a queda exagerou nas últimas horas e se já está voltando.
+  curto_prazo:
+    pontos_para_interesse: 3
+    rsi_1h_maximo: 30            # 1) RSI de 1 hora abaixo de 30
+    abaixo_media_7d: -8          # 2) 8% ou mais abaixo da média dos últimos 7 dias
+    medo_maximo: 40              # 3) índice de medo e ganância em 40 ou menos
+    repique_minimo: 1            # 4) subiu 1% ou mais desde o fundo das últimas 2 horas
+    volume_acima_normal: 50      # 5) volume das últimas 3h 50% acima do normal (pânico)
+
 # Emojis usados nas mensagens.
 emojis:
   noticia: "🌍"          # antes da notícia / explicação do motivo (Fase 3)
-  zona_interesse: "🎯"   # quando a leitura indica possível zona de compra (Fase 2)
-  sem_sinal: "⚠️"        # quando a leitura NÃO indica zona de compra (Fase 2)
+  zona_interesse: "🎯"   # quando a leitura indica possível zona de compra
+  sem_sinal: "⚠️"        # quando a leitura NÃO indica zona de compra
