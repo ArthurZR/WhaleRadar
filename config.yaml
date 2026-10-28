@@ -8,16 +8,19 @@ moedas:
     simbolo: BTC
     coinbase: BTC-USD   # nome na Coinbase (preço minuto a minuto, para quedas bruscas)
     emoji: "🪙"
+    noticias: Bitcoin     # termo pesquisado no Google Notícias
     perfil: longo_prazo   # comprar e segurar (veja "termometro" lá embaixo)
   - id: ethereum
     simbolo: ETH
     coinbase: ETH-USD
     emoji: "🔷"
+    noticias: Ethereum
     perfil: longo_prazo   # segurar, comprando mais em quedas fortes
   - id: solana
     simbolo: SOL
     coinbase: SOL-USD
     emoji: "🟣"
+    noticias: Solana
     perfil: curto_prazo   # comprar e vender
 
 # Quando avisar (perfil "alertas mais frequentes").

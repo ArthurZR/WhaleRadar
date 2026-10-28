@@ -110,6 +110,30 @@ def _painel(indicadores, destacados, alta):
     return linhas
 
 
+def _ha_quanto_tempo(momento):
+    """datetime -> 'há 25 min' / 'há 3h'."""
+    minutos = int((datetime.now(timezone.utc) - momento).total_seconds() // 60)
+    return f"há {max(minutos, 1)} min" if minutos < 60 else f"há {minutos // 60}h"
+
+
+def _bloco_porque(explicacao, emojis):
+    """'Por quê' + link da notícia + nível de certeza."""
+    linhas = [f"{emojis['noticia']} <b>Por quê:</b> {escape(explicacao['texto'], quote=False)}"]
+    noticia = explicacao["noticia"]
+    if noticia:
+        link = escape(noticia["link"], quote=True)
+        detalhes = noticia["fonte"]
+        if noticia["quando"]:
+            detalhes += f", {_ha_quanto_tempo(noticia['quando'])}"
+        linhas.append(
+            f"📰 <a href=\"{link}\">{escape(noticia['titulo'], quote=False)}</a> ({escape(detalhes, quote=False)})"
+        )
+    else:
+        linhas.append("📰 Não achei notícia recente que explique o movimento.")
+    linhas.append(f"<i>Nível de certeza: {explicacao['certeza']}</i>")
+    return linhas
+
+
 def _bloco_termometro(termometro, emojis):
     """Placar do termômetro de compra, com cada ponto explicado."""
     linhas = [f"<b>Termômetro de compra: {termometro['pontos']}/{termometro['total']}</b>"]
@@ -120,11 +144,12 @@ def _bloco_termometro(termometro, emojis):
     return linhas
 
 
-def montar_alerta(moeda, dados, preco_brl, indicadores, quedas, termometro, emojis):
+def montar_alerta(moeda, dados, preco_brl, indicadores, quedas, termometro, explicacao, emojis):
     """Mensagem de alerta de queda para uma moeda.
 
     quedas: regras que dispararam, a mais forte primeiro (ex.: ["24h", "1h"]).
     termometro: resultado do termometro.py, ou None se não deu para calcular.
+    explicacao: resultado do explicacao.py ("por quê"), ou None.
     """
     nome = f"{moeda['emoji']} {moeda['simbolo']}"
 
@@ -144,7 +169,10 @@ def montar_alerta(moeda, dados, preco_brl, indicadores, quedas, termometro, emoj
     linhas = [f"<b>{titulo}</b>"]
     if "15min" in quedas:
         linhas.append(_quando(indicadores["brusca_inicio"], indicadores["brusca_fim"]))
-    linhas += [_linha_preco(dados, preco_brl), "", "Variação:", *_painel(indicadores, quedas, alta=False)]
+    linhas.append(_linha_preco(dados, preco_brl))
+    if explicacao:
+        linhas += ["", *_bloco_porque(explicacao, emojis)]
+    linhas += ["", "Variação:", *_painel(indicadores, quedas, alta=False)]
 
     linhas.append("")
     if termometro:
@@ -155,10 +183,11 @@ def montar_alerta(moeda, dados, preco_brl, indicadores, quedas, termometro, emoj
     return finalizar("\n".join(linhas))
 
 
-def montar_alerta_alta(moeda, dados, preco_brl, indicadores, altas):
+def montar_alerta_alta(moeda, dados, preco_brl, indicadores, altas, explicacao, emojis):
     """Mensagem de alerta de alta forte (sem termômetro de compra).
 
     altas: regras que dispararam, a mais forte primeiro (ex.: ["24h", "1h"]).
+    explicacao: resultado do explicacao.py ("por quê"), ou None.
     """
     nome = f"{moeda['emoji']} {moeda['simbolo']}"
 
@@ -174,8 +203,10 @@ def montar_alerta_alta(moeda, dados, preco_brl, indicadores, altas):
     linhas = [f"<b>{titulo}</b>"]
     if "15min" in altas:
         linhas.append(_quando(indicadores["alta_brusca_inicio"], indicadores["alta_brusca_fim"]))
+    linhas.append(_linha_preco(dados, preco_brl))
+    if explicacao:
+        linhas += ["", *_bloco_porque(explicacao, emojis)]
     linhas += [
-        _linha_preco(dados, preco_brl),
         "",
         "Variação:",
         *_painel(indicadores, altas, alta=True),

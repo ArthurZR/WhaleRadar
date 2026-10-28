@@ -1,8 +1,8 @@
 """Ponto de entrada do WhaleRadar.
 
 Olha BTC, ETH e SOL e manda no Telegram:
-- alerta de queda (com termômetro de compra de 0 a 5) quando alguma cai além dos limites;
-- alerta de alta forte quando alguma sobe bem mais que o normal.
+- alerta de queda (com "por quê", notícia e termômetro de compra de 0 a 5) quando alguma cai além dos limites;
+- alerta de alta forte (com "por quê" e notícia) quando alguma sobe bem mais que o normal.
 Tudo respeitando o anti-spam e os limites do config.yaml.
 
 Como rodar (dentro da pasta do projeto):
@@ -26,6 +26,7 @@ from alerts import (
     pode_alertar,
     quedas_detectadas,
 )
+from explicacao import explicar
 from mensagens import montar_alerta, montar_alerta_alta, montar_resumo
 from prices import (
     buscar_historico_diario,
@@ -134,6 +135,10 @@ def main():
                 medo_cache["valor"] = None
         return medo_cache["valor"]
 
+    # 1º passo: junta os dados de TODAS as moedas (a explicação de uma moeda
+    # compara com as outras no mesmo período).
+    velas_todas = {}
+    indicadores_todos = {}
     for moeda in config["moedas"]:
         simbolo = moeda["simbolo"]
         dados = mercado.get(moeda["id"])
@@ -143,13 +148,41 @@ def main():
 
         # Movimentos bruscos (Coinbase). Se a Coinbase falhar, as outras regras continuam valendo.
         try:
-            velas_1min = buscar_velas_1min(moeda["coinbase"])
-            bruscos = movimentos_bruscos(velas_1min, desde, agora)
+            velas_todas[simbolo] = buscar_velas_1min(moeda["coinbase"])
+            bruscos = movimentos_bruscos(velas_todas[simbolo], desde, agora)
         except Exception as erro:
             print(f"{simbolo}: não consegui o preço minuto a minuto ({erro}).")
-            velas_1min, bruscos = [], None
+            velas_todas[simbolo], bruscos = [], None
 
-        indicadores = calcular_indicadores(dados, bruscos)
+        indicadores_todos[simbolo] = calcular_indicadores(dados, bruscos)
+
+    def porque(moeda, regras_disparadas, direcao, indicadores):
+        """'Por que caiu/subiu?' para a regra principal do alerta (ou None se falhar)."""
+        principal = regras_disparadas[0]
+        inicio = fim = None
+        if principal == "15min":
+            prefixo = "brusca" if direcao == "queda" else "alta_brusca"
+            inicio, fim = indicadores[f"{prefixo}_inicio"], indicadores[f"{prefixo}_fim"]
+            variacao = indicadores["15min" if direcao == "queda" else "alta_15min"]
+        elif principal == "distancia_maxima":
+            variacao = indicadores["7d"]  # comparamos a semana inteira
+        else:
+            variacao = indicadores[principal]
+        try:
+            return explicar(moeda, principal, direcao, variacao, config["moedas"],
+                            indicadores_todos, velas_todas, inicio, fim)
+        except Exception as erro:
+            print(f"{moeda['simbolo']}: não consegui montar o 'por quê' ({erro}).")
+            return None
+
+    # 2º passo: decide e envia os alertas de cada moeda.
+    for moeda in config["moedas"]:
+        simbolo = moeda["simbolo"]
+        if simbolo not in indicadores_todos:
+            continue
+        dados = mercado[moeda["id"]]
+        velas_1min = velas_todas[simbolo]
+        indicadores = indicadores_todos[simbolo]
         preco = dados["current_price"]
         preco_brl = precos_brl.get(moeda["id"])
 
@@ -161,7 +194,9 @@ def main():
             print(f"{simbolo}: queda detectada ({', '.join(quedas)}), mas o anti-spam segurou.")
         else:
             termometro = calcular_termometro(config, moeda, dados, velas_1min, medo(), agora)
-            enviar(montar_alerta(moeda, dados, preco_brl, indicadores, quedas, termometro, config["emojis"]))
+            explicacao = porque(moeda, quedas, "queda", indicadores)
+            enviar(montar_alerta(moeda, dados, preco_brl, indicadores, quedas, termometro, explicacao,
+                                 config["emojis"]))
             # Só anota na memória depois que a mensagem foi enviada com sucesso.
             if not so_ver:
                 memoria[simbolo] = {"quando": agora, "preco": preco}
@@ -174,7 +209,8 @@ def main():
         elif not pode_alertar(memoria.get(chave_alta), preco, agora, config["anti_spam"], "15min" in altas, alta=True):
             print(f"{simbolo}: alta detectada ({', '.join(altas)}), mas o anti-spam segurou.")
         else:
-            enviar(montar_alerta_alta(moeda, dados, preco_brl, indicadores, altas))
+            explicacao = porque(moeda, altas, "alta", indicadores)
+            enviar(montar_alerta_alta(moeda, dados, preco_brl, indicadores, altas, explicacao, config["emojis"]))
             if not so_ver:
                 memoria[chave_alta] = {"quando": agora, "preco": preco}
 
