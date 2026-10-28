@@ -103,6 +103,7 @@ radar:
   quantas: 60                  # olha as 60 maiores por valor de mercado (sobram ~40 após os filtros)
   volume_minimo_usd: 20000000  # liquidez: pelo menos US$ 20 milhões negociados em 24h
   max_detalhadas: 5            # quantas moedas ganham "por quê" e notícia na mensagem
+  max_listadas: 10             # acima disso, as mais fracas aparecem só pelo símbolo
   limites_queda:
     "1h": -6
     "24h": -12

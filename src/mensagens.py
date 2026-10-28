@@ -252,16 +252,17 @@ def montar_alerta_alta(moeda, dados, preco_brl, indicadores, altas, explicacao, 
     return finalizar("\n".join(linhas))
 
 
-def montar_radar(achados, explicacoes, emojis):
+def montar_radar(achados, explicacoes, emojis, max_listadas=10):
     """Uma mensagem só com todos os movimentos fortes das outras moedas grandes.
 
     achados: resultado de radar.detectar (o mais forte primeiro).
     explicacoes: {simbolo: resultado do explicacao.py} para as mais fortes.
+    max_listadas: acima disso, as mais fracas viram só "e mais N moedas".
     """
     plural = "s" if len(achados) > 1 else ""
     linhas = [f"<b>🛰️ Radar: {len(achados)} movimento{plural} forte{plural} entre as maiores moedas</b>", ""]
 
-    for achado in achados:
+    for achado in achados[:max_listadas]:
         moeda = achado["moeda"]
         simbolo = moeda["symbol"].upper()
         principal = achado["regras"][0]
@@ -282,6 +283,11 @@ def montar_radar(achados, explicacoes, emojis):
                 link = escape(noticia["link"], quote=True)
                 linhas.append(f"   📰 <a href=\"{link}\">{escape(noticia['titulo'], quote=False)}</a>")
         linhas.append("")
+
+    restantes = achados[max_listadas:]
+    if restantes:
+        nomes = ", ".join(a["moeda"]["symbol"].upper() for a in restantes)
+        linhas += [f"E mais {len(restantes)}: {escape(nomes, quote=False)}.", ""]
 
     linhas.append(
         "⚠️ Moedas fora de BTC, ETH e SOL costumam ser mais arriscadas: "

@@ -115,7 +115,7 @@ def rodar_radar(config, memoria, agora, indicadores_todos, velas_todas, enviar, 
         except Exception as erro:
             print(f"Radar {simbolo}: não consegui montar o 'por quê' ({erro}).")
 
-    enviar(montar_radar(achados, explicacoes, config["emojis"]))
+    enviar(montar_radar(achados, explicacoes, config["emojis"], regras["max_listadas"]))
     if not so_ver:
         for achado in achados:
             simbolo = achado["moeda"]["symbol"].upper()

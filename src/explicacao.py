@@ -97,7 +97,11 @@ def explicar(moeda, janela, direcao, variacao_moeda, moedas, indicadores_todos, 
                      f"no mesmo período: parece um movimento do mercado todo, não algo só de {simbolo}.")
             certeza = 1
         elif proporcao <= 0.25:
-            mexeu = "quase não se mexeram" if plural else "quase não se mexeu"
+            if proporcao < 0 and abs(referencia) >= 1:
+                # O mercado foi para o lado contrário (ex.: Bitcoin subiu enquanto a moeda caiu).
+                mexeu = "foram na direção contrária" if plural else "foi na direção contrária"
+            else:
+                mexeu = "quase não se mexeram" if plural else "quase não se mexeu"
             texto = (f"{maiuscula(nome_ref)} {mexeu} ({formatar_variacao(referencia)}{em_media}) "
                      f"no mesmo período: {verbo['nome']} parece ser específica de {simbolo}.")
             certeza = 0
