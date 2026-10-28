@@ -18,6 +18,7 @@ from pathlib import Path
 
 import yaml
 
+import radar
 import state
 from alerts import (
     altas_detectadas,
@@ -27,9 +28,10 @@ from alerts import (
     quedas_detectadas,
 )
 from explicacao import explicar
-from mensagens import montar_alerta, montar_alerta_alta, montar_resumo
+from mensagens import montar_alerta, montar_alerta_alta, montar_radar, montar_resumo
 from prices import (
     buscar_historico_diario,
+    buscar_maiores,
     buscar_medo_ganancia,
     buscar_mercado,
     buscar_precos_brl,
@@ -81,6 +83,46 @@ def calcular_termometro(config, moeda, dados, velas_1min, medo, agora):
     except Exception as erro:
         print(f"{moeda['simbolo']}: não consegui calcular o termômetro ({erro}).")
         return None
+
+
+def rodar_radar(config, memoria, agora, indicadores_todos, velas_todas, enviar, so_ver):
+    """Procura movimentos fortes nas outras moedas grandes e manda UMA mensagem com todos.
+
+    Devolve a lista de moedas que passaram nos filtros (usada no resumo e no painel).
+    """
+    regras = config["radar"]
+    principais = [m["simbolo"] for m in config["moedas"]]
+    moedas = radar.filtrar(buscar_maiores(regras["quantas"]), regras, principais)
+    print(f"Radar: {len(moedas)} moedas passaram nos filtros.")
+
+    achados = radar.detectar(moedas, regras, memoria, agora)
+    if not achados:
+        print("Radar: nenhum movimento forte.")
+        return moedas
+
+    # "Por quê" e notícia só para as mais fortes (cada uma faz buscas de notícia).
+    explicacoes = {}
+    for achado in achados[: regras["max_detalhadas"]]:
+        moeda = achado["moeda"]
+        simbolo = moeda["symbol"].upper()
+        principal = achado["regras"][0]
+        try:
+            explicacoes[simbolo] = explicar(
+                {"simbolo": simbolo, "noticias": [moeda["name"], simbolo]},
+                principal, achado["direcao"], achado["indicadores"][principal],
+                config["moedas"], indicadores_todos, velas_todas,
+            )
+        except Exception as erro:
+            print(f"Radar {simbolo}: não consegui montar o 'por quê' ({erro}).")
+
+    enviar(montar_radar(achados, explicacoes, config["emojis"]))
+    if not so_ver:
+        for achado in achados:
+            simbolo = achado["moeda"]["symbol"].upper()
+            memoria[f"radar:{simbolo}:{achado['direcao']}"] = {
+                "quando": agora, "preco": achado["moeda"]["current_price"],
+            }
+    return moedas
 
 
 def main():
@@ -213,6 +255,15 @@ def main():
             enviar(montar_alerta_alta(moeda, dados, preco_brl, indicadores, altas, explicacao, config["emojis"]))
             if not so_ver:
                 memoria[chave_alta] = {"quando": agora, "preco": preco}
+
+    # --- Radar das outras moedas grandes (Fase 5) ---
+    radar_moedas = []
+    if config["radar"]["ativo"]:
+        try:
+            radar_moedas = rodar_radar(config, memoria, agora, indicadores_todos, velas_todas, enviar, so_ver)
+        except Exception as erro:
+            # O radar é um extra: se falhar, não pode atrapalhar os alertas principais.
+            print(f"Radar: falhou ({erro}).")
 
     if not so_ver:
         state.salvar(memoria)

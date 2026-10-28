@@ -87,3 +87,17 @@ def buscar_medo_ganancia():
     resposta.raise_for_status()
     dados = resposta.json()["data"][0]
     return {"valor": int(dados["value"]), "texto": dados["value_classification"]}
+
+
+def buscar_maiores(quantas):
+    """As N maiores moedas por valor de mercado, com variações de 1h, 24h e 7 dias (CoinGecko)."""
+    parametros = {
+        "vs_currency": "usd",
+        "order": "market_cap_desc",
+        "per_page": quantas,
+        "page": 1,
+        "price_change_percentage": "1h,24h,7d",
+    }
+    resposta = requests.get(URL_MERCADO, params=parametros, timeout=20)
+    resposta.raise_for_status()
+    return resposta.json()

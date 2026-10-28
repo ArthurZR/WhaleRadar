@@ -4,6 +4,7 @@ As mensagens usam o formato HTML do Telegram: <b>negrito</b> e <code>texto de
 largura fixa</code> (necessário para a arte da baleia não sair torta).
 """
 
+import math
 from datetime import datetime, timedelta, timezone
 from html import escape
 
@@ -30,6 +31,15 @@ def formatar_numero(valor, casas=2):
     """Formata no padrão brasileiro: 1234567.8 -> '1.234.567,80'."""
     texto = f"{valor:,.{casas}f}"  # vira '1,234,567.80'
     return texto.replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def formatar_preco(valor):
+    """Preço com casas suficientes até para moedas baratíssimas: 0.00000484 -> '0,00000484'."""
+    if valor >= 1:
+        return formatar_numero(valor, 2)
+    # Pelo menos 3 algarismos significativos depois dos zeros.
+    casas = max(2, -math.floor(math.log10(valor)) + 2) if valor > 0 else 2
+    return formatar_numero(valor, casas)
 
 
 def formatar_variacao(valor):
@@ -239,4 +249,42 @@ def montar_alerta_alta(moeda, dados, preco_brl, indicadores, altas, explicacao, 
         "",
         _frase_altas(moeda),
     ]
+    return finalizar("\n".join(linhas))
+
+
+def montar_radar(achados, explicacoes, emojis):
+    """Uma mensagem só com todos os movimentos fortes das outras moedas grandes.
+
+    achados: resultado de radar.detectar (o mais forte primeiro).
+    explicacoes: {simbolo: resultado do explicacao.py} para as mais fortes.
+    """
+    plural = "s" if len(achados) > 1 else ""
+    linhas = [f"<b>🛰️ Radar: {len(achados)} movimento{plural} forte{plural} entre as maiores moedas</b>", ""]
+
+    for achado in achados:
+        moeda = achado["moeda"]
+        simbolo = moeda["symbol"].upper()
+        principal = achado["regras"][0]
+        valor = achado["indicadores"][principal]
+        queda = achado["direcao"] == "queda"
+        verbo = "caiu" if queda else "subiu"
+        linhas.append(
+            f"{'🔻' if queda else '🚀'} <b>{escape(simbolo, quote=False)}</b> "
+            f"{escape(moeda['name'], quote=False)} (#{moeda.get('market_cap_rank') or '?'}) "
+            f"{verbo} {formatar_numero(abs(valor), 1)}% em {NOMES_PERIODO[principal]} · "
+            f"US$ {formatar_preco(moeda['current_price'])}"
+        )
+        explicacao = explicacoes.get(simbolo)
+        if explicacao:
+            linhas.append(f"   {emojis['noticia']} {escape(explicacao['texto'], quote=False)}")
+            noticia = explicacao["noticia"]
+            if noticia:
+                link = escape(noticia["link"], quote=True)
+                linhas.append(f"   📰 <a href=\"{link}\">{escape(noticia['titulo'], quote=False)}</a>")
+        linhas.append("")
+
+    linhas.append(
+        "⚠️ Moedas fora de BTC, ETH e SOL costumam ser mais arriscadas: "
+        "menos negociadas e com movimentos mais bruscos."
+    )
     return finalizar("\n".join(linhas))

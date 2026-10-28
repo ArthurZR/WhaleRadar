@@ -94,6 +94,75 @@ termometro:
     repique_minimo: 1            # 4) subiu 1% ou mais desde o fundo das últimas 2 horas
     volume_acima_normal: 50      # 5) volume das últimas 3h 50% acima do normal (pânico)
 
+# Radar das outras moedas grandes (Fase 5).
+# Olha as maiores moedas (fora BTC, ETH e SOL) e avisa só movimentos bem fortes,
+# todos juntos numa mensagem só. São moedas mais arriscadas, então os limites
+# são mais altos que os das suas moedas principais.
+radar:
+  ativo: true
+  quantas: 60                  # olha as 60 maiores por valor de mercado (sobram ~40 após os filtros)
+  volume_minimo_usd: 20000000  # liquidez: pelo menos US$ 20 milhões negociados em 24h
+  max_detalhadas: 5            # quantas moedas ganham "por quê" e notícia na mensagem
+  limites_queda:
+    "1h": -6
+    "24h": -12
+    "7d": -25
+  limites_alta:
+    "1h": 8
+    "24h": 15
+    "7d": 40
+  anti_spam:                   # mesma lógica das moedas principais, mas mais espaçado
+    intervalo_horas: 12
+    nova_queda_minima: 5
+    esquecer_apos_horas: 48
+    intervalo_brusca_minutos: 60
+  # Segurança: fora do radar ficam dólares digitais, ouro tokenizado e fundos
+  # tokenizados (não são cripto "de verdade" e quase não mexem), além de
+  # versões "embrulhadas" de outras moedas. Moedas com preço praticamente parado
+  # também são ignoradas automaticamente.
+  excluir:
+    - tether
+    - usd-coin
+    - usds
+    - dai
+    - ethena-usde
+    - usd1-wlfi
+    - global-dollar
+    - paypal-usd
+    - ripple-usd
+    - usdd
+    - falcon-finance
+    - united-stables
+    - bfusd
+    - usdgo
+    - first-digital-usd
+    - true-usd
+    - figure-heloc
+    - hashnote-usyc
+    - ondo-us-dollar-yield
+    - blackrock-usd-institutional-digital-liquidity-fund
+    - spiko-amundi-overnight-swap-fund-eur
+    - tether-gold
+    - pax-gold
+    - wrapped-bitcoin
+    - coinbase-wrapped-btc
+    - staked-ether
+    - wrapped-steth
+    - weth
+    - wrapped-eeth
+    - binance-staked-sol
+    - jito-staked-sol
+
+# Resumo diário (Fase 6): uma mensagem por dia com a situação geral.
+resumo_diario:
+  ativo: true
+  hora: 9                      # horário de Brasília
+
+# Painel visual (Fase 6), publicado no GitHub Pages.
+painel:
+  ativo: true
+  endereco: https://arthurzr.github.io/WhaleRadar/
+
 # Emojis usados nas mensagens.
 emojis:
   noticia: "🌍"          # antes da notícia / explicação do motivo (Fase 3)
