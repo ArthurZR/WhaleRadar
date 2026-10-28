@@ -110,7 +110,9 @@ def explicar(moeda, janela, direcao, variacao_moeda, moedas, indicadores_todos, 
     if mercado_todo:
         btc = next((m["noticias"] for m in moedas if m["simbolo"] == "BTC"), ["Bitcoin"])
         buscas.append(("criptomoedas" if simbolo == "BTC" else btc[0], btc + NOMES_MERCADO))
-    noticia = buscar_noticia(buscas, direcao)
+    # Movimento rápido pede notícia bem recente; movimento de dias aceita notícia de até 1 dia.
+    max_horas = 6 if janela in ("15min", "1h") else 24
+    noticia = buscar_noticia(buscas, direcao, max_horas)
     if noticia:
         certeza = min(certeza + 1, len(NIVEIS) - 1)
 

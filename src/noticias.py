@@ -66,13 +66,14 @@ def _cita(titulo, nomes):
     return any(re.search(rf"\b{re.escape(nome)}\b", titulo, re.IGNORECASE) for nome in nomes)
 
 
-def buscar_noticia(buscas, direcao):
+def buscar_noticia(buscas, direcao, max_horas=24):
     """Procura a manchete recente mais relacionada ao movimento.
 
     buscas: lista de (o que pesquisar, nomes que a manchete precisa citar), em
             ordem de preferência. Ex.: [("Solana", ["Solana", "SOL"]),
                                         ("Bitcoin", ["Bitcoin", "BTC", "cripto", "crypto"])]
     direcao: "queda" ou "alta".
+    max_horas: idade máxima da notícia (uma notícia velha não explica um movimento de agora).
     Retorna {"titulo", "fonte", "link", "quando"} ou None se nada servir.
     """
     palavras = PALAVRAS[direcao]
@@ -93,7 +94,7 @@ def buscar_noticia(buscas, direcao):
             ]
             boas.sort(key=lambda m: m["quando"] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
             for manchete in boas:
-                # Ignora notícias com mais de 24 horas.
-                if manchete["quando"] is None or (agora - manchete["quando"]).total_seconds() <= 24 * 3600:
+                # Ignora notícias velhas demais.
+                if manchete["quando"] is None or (agora - manchete["quando"]).total_seconds() <= max_horas * 3600:
                     return manchete
     return None
