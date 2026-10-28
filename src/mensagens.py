@@ -1,7 +1,7 @@
 """Monta o texto das mensagens que vão para o Telegram.
 
-As mensagens usam o formato HTML do Telegram: <b>negrito</b> e <pre>bloco de
-largura fixa</pre> (necessário para a arte da baleia não sair torta).
+As mensagens usam o formato HTML do Telegram: <b>negrito</b> e <code>texto de
+largura fixa</code> (necessário para a arte da baleia não sair torta).
 """
 
 from datetime import datetime, timedelta, timezone
@@ -40,7 +40,9 @@ def formatar_variacao(valor):
 
 def finalizar(texto):
     """Acrescenta o aviso e a arte da baleia ao fim de qualquer mensagem."""
-    return f"{texto}\n\n{AVISO}\n<pre>{escape(ARTE_BALEIA, quote=False)}</pre>"
+    # <code> deixa a arte em fonte de largura fixa (fica alinhada) sem o quadro
+    # com botão "copy" que o Telegram coloca em volta de blocos <pre>.
+    return f"{texto}\n\n{AVISO}\n<code>{escape(ARTE_BALEIA, quote=False)}</code>"
 
 
 def montar_resumo(config, mercado, precos_brl):

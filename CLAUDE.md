@@ -75,7 +75,7 @@ whaleradar/
 ## Identidade visual das mensagens (pedido do Arthur)
 
 - Emoji antes de cada moeda: BTC 🪙, ETH 🔷, SOL 🟣 (em `config.yaml`).
-- Toda mensagem termina com o aviso e a arte ASCII da baleia em bloco `<pre>` (em `src/mensagens.py`). Mensagens são enviadas com `parse_mode=HTML`: escapar texto dinâmico.
+- Toda mensagem termina com o aviso e a arte ASCII da baleia em `<code>` (não `<pre>`: o Arthur não gostou do quadro com "copy") (em `src/mensagens.py`). Mensagens são enviadas com `parse_mode=HTML`: escapar texto dinâmico.
 - 🌍 antes da notícia / explicação do motivo (Fase 3).
 - 🎯 quando a leitura indica possível zona de compra; ⚠️ quando não indica (Fase 2). Continua sendo "leitura", nunca "recomendação".
 
