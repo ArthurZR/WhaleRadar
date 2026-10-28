@@ -29,11 +29,13 @@ Bot que avisa no Telegram quando BTC, ETH e SOL caem, explica em português simp
 
    ```
    pip install -r requirements.txt
-   python src/main.py --so-ver
+   python src/main.py --teste --so-ver
+   python src/main.py --teste
    python src/main.py
    ```
 
-   O primeiro comando só mostra a mensagem na tela; o segundo envia para o Telegram.
+   O primeiro só mostra a mensagem de preços na tela; o segundo a envia para o Telegram;
+   o terceiro é o modo normal (só avisa se houver queda).
 
 ### 4. Colocar no GitHub
 
@@ -41,8 +43,9 @@ Bot que avisa no Telegram quando BTC, ETH e SOL caem, explica em português simp
 2. No repositório: **Settings → Secrets and variables → Actions → New repository secret**. Crie dois:
    - `TELEGRAM_BOT_TOKEN`
    - `TELEGRAM_CHAT_ID`
-3. Aba **Actions → Radar → Run workflow** para rodar na hora.
-4. Depois disso ele roda sozinho a cada 3 horas (na Fase 1 passa a ser a cada 15 min).
+3. Aba **Actions → Radar → Run workflow** para rodar na hora. Marque a caixinha
+   **"Mandar mensagem de teste"** para receber os preços atuais mesmo sem queda.
+4. Depois disso ele roda sozinho a cada 30 minutos e **só manda mensagem quando alguma moeda cai** além dos limites do `config.yaml`.
 
 **Pronto quando:** a mensagem com os preços chega no celular, tanto rodando manualmente quanto pelo agendamento.
 

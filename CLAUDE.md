@@ -41,15 +41,16 @@ whaleradar/
 │   ├── prices.py          # busca de preços
 │   ├── alerts.py          # regras de queda e anti-spam
 │   ├── telegram_bot.py    # envio de mensagens
-│   └── state.py           # guarda último alerta de cada moeda
+│   ├── mensagens.py       # monta o texto das mensagens (emojis, arte da baleia)
+│   └── state.py           # guarda último alerta de cada moeda (.estado/, no cache do Actions)
 └── .github/workflows/
     └── radar.yml          # agendamento
 ```
 
 ## Roteiro por fases
 
-- **Fase 0 – Fundação (atual):** repositório, bot do Telegram, chaves, workflow agendado, mensagem de teste chegando no celular.
-- **Fase 1 – Detector de queda:** alerta por queda em 1h / 24h / 7d e distância da máxima recente, com anti-spam.
+- **Fase 0 – Fundação (feita):** repositório, bot do Telegram, chaves, workflow agendado, mensagem de teste chegando no celular.
+- **Fase 1 – Detector de queda (implementada em 28/10/2026, aguardando primeira queda real):** alerta por queda em 1h / 24h / 7d e distância da máxima de 7 dias, com anti-spam. Limites no perfil "frequente" (-3% 1h, -4% 24h, -10% 7d, -10% da máxima). Roda a cada 30 min (não 15) para caber nos 2.000 min grátis/mês de repositório privado.
 - **Fase 2 – Termômetro de compra:** placar 0 a 5 (preço barato vs histórico, medo extremo, RSI), cada ponto explicado.
 - **Fase 3 – "Por que caiu?":** notícias, movimento do BTC/mercado e liquidações resumidos em linguagem simples, com nível de certeza.
 - **Fase 4 – Backtest:** testar as regras em dados históricos e ajustar critérios com números.
@@ -71,24 +72,32 @@ whaleradar/
 
 **Critério de pronto da Fase 0:** o GitHub Actions roda sozinho e o Telegram recebe uma mensagem com os preços de BTC, ETH e SOL.
 
+## Identidade visual das mensagens (pedido do Arthur)
+
+- Emoji antes de cada moeda: BTC 🪙, ETH 🔷, SOL 🟣 (em `config.yaml`).
+- Toda mensagem termina com o aviso e a arte ASCII da baleia em bloco `<pre>` (em `src/mensagens.py`). Mensagens são enviadas com `parse_mode=HTML`: escapar texto dinâmico.
+- 🌍 antes da notícia / explicação do motivo (Fase 3).
+- 🎯 quando a leitura indica possível zona de compra; ⚠️ quando não indica (Fase 2). Continua sendo "leitura", nunca "recomendação".
+
 ## Formato-alvo da mensagem (a partir da Fase 2/3)
 
 ```
-🔻 SOL caiu 11% em 6h (R$ 1.020)
-Por quê: o Bitcoin caiu 5% no mesmo período e houve muita venda forçada. Não achei notícia específica da Solana, então parece movimento do mercado todo.
+🔻 🟣 SOL caiu 11% em 6h (R$ 1.020)
+🌍 Por quê: o Bitcoin caiu 5% no mesmo período e houve muita venda forçada. Não achei notícia específica da Solana, então parece movimento do mercado todo.
 Termômetro de compra: 3/5
 ✅ preço bem abaixo da média do último mês
 ✅ mercado com medo
-⚠️ a queda ainda está acelerando
-Leitura: possível zona de interesse, mas ainda sem sinal de que parou de cair.
+❌ a queda ainda está acelerando
+🎯 Leitura: possível zona de interesse, mas ainda sem sinal de que parou de cair.
 ℹ️ Informação, não recomendação de investimento.
+(arte da baleia)
 ```
 
 ## Decisões em aberto (perguntar ao usuário antes da fase indicada)
 
 - **Fase 3:** usar a API da Anthropic para escrever os "porquês"? (custo baixo, centavos por alerta) ou modelo de texto fixo?
 - **Fase 2:** perfil do usuário: comprar e segurar a longo prazo, ou operar movimentos curtos? Muda os critérios do termômetro.
-- **Fase 1:** sensibilidade dos alertas: poucos e fortes (ex.: -8% em 24h) ou mais frequentes (ex.: -4%)?
+- ~~**Fase 1:** sensibilidade dos alertas~~ → decidido: **mais frequentes** (28/10/2026).
 
 ## Convenções de trabalho
 
