@@ -9,6 +9,8 @@ E procura uma notícia recente que fale do movimento.
 Nunca afirma a causa: diz o que "parece" e dá um nível de certeza.
 """
 
+from datetime import datetime, timedelta, timezone
+
 from mensagens import formatar_variacao
 from noticias import buscar_noticia
 
@@ -113,7 +115,9 @@ def explicar(moeda, janela, direcao, variacao_moeda, moedas, indicadores_todos, 
     # Movimento rápido pede notícia bem recente; movimento de dias aceita notícia de até 1 dia.
     max_horas = 6 if janela in ("15min", "1h") else 24
     noticia = buscar_noticia(buscas, direcao, max_horas)
-    if noticia:
+    # Só uma notícia bem recente (até 6h) aumenta a certeza; uma mais antiga
+    # aparece como referência, mas pode não ter relação com o movimento de agora.
+    if noticia and noticia["quando"] and datetime.now(timezone.utc) - noticia["quando"] <= timedelta(hours=6):
         certeza = min(certeza + 1, len(NIVEIS) - 1)
 
     return {"texto": texto, "noticia": noticia, "certeza": NIVEIS[certeza]}
