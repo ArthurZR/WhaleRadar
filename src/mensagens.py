@@ -23,7 +23,7 @@ ARTE_BALEIA = r"""
 """.strip("\n")
 
 # Como cada regra de queda aparece escrita.
-NOMES_PERIODO = {"15min": "15 min", "1h": "1h", "24h": "24h", "7d": "7 dias"}
+NOMES_PERIODO = {"15min": "pior trecho de 15 min", "1h": "1h", "24h": "24h", "7d": "7 dias"}
 
 
 def formatar_numero(valor, casas=2):
@@ -83,7 +83,11 @@ def montar_alerta(moeda, dados, preco_brl, indicadores, quedas):
         titulo = f"🔻 {nome} está {queda}% abaixo da máxima dos últimos 7 dias"
     elif principal == "15min":
         queda = formatar_numero(abs(indicadores["15min"]), 1)
-        titulo = f"⚡ {nome} despencou {queda}% em 15 min"
+        minutos = 15
+        if indicadores["brusca_inicio"]:
+            duracao = indicadores["brusca_fim"] - indicadores["brusca_inicio"]
+            minutos = max(1, round(duracao.total_seconds() / 60))
+        titulo = f"⚡ {nome} despencou {queda}% em {minutos} min"
     else:
         queda = formatar_numero(abs(indicadores[principal]), 1)
         titulo = f"🔻 {nome} caiu {queda}% em {NOMES_PERIODO[principal]}"
@@ -108,5 +112,12 @@ def montar_alerta(moeda, dados, preco_brl, indicadores, quedas):
     )
     painel.append(f"<b>{linha}</b>" if "distancia_maxima" in quedas else linha)
 
-    texto = "\n".join([f"<b>{titulo}</b>", preco, "", "Variação:", *painel])
+    cabecalho = [f"<b>{titulo}</b>"]
+    if "15min" in quedas and indicadores["brusca_inicio"]:
+        # A queda brusca pode ter acontecido alguns minutos antes desta checagem.
+        inicio = indicadores["brusca_inicio"].astimezone(FUSO_BRASILIA).strftime("%H:%M")
+        fim = indicadores["brusca_fim"].astimezone(FUSO_BRASILIA).strftime("%H:%M")
+        cabecalho.append(f"Aconteceu entre {inicio} e {fim} (horário de Brasília)")
+
+    texto = "\n".join([*cabecalho, preco, "", "Variação:", *painel])
     return finalizar(texto)

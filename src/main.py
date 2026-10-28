@@ -11,13 +11,13 @@ Como rodar (dentro da pasta do projeto):
 
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import yaml
 
 import state
-from alerts import calcular_indicadores, calcular_queda_brusca, pode_alertar, quedas_detectadas
+from alerts import calcular_indicadores, maior_queda_brusca, pode_alertar, quedas_detectadas
 from mensagens import montar_alerta, montar_resumo
 from prices import buscar_mercado, buscar_precos_brl, buscar_velas_1min
 from telegram_bot import enviar_mensagem
@@ -79,6 +79,14 @@ def main():
     memoria = state.carregar()
     agora = datetime.now(timezone.utc)
 
+    # Período a rever em busca de quedas bruscas: desde a última checagem
+    # (com 2 minutos de folga), limitado a no máximo 2 horas para trás.
+    ultima_verificacao = state.carregar_ultima_verificacao()
+    if ultima_verificacao is None:
+        desde = agora - timedelta(minutes=20)
+    else:
+        desde = max(ultima_verificacao - timedelta(minutes=2), agora - timedelta(hours=2))
+
     for moeda in config["moedas"]:
         simbolo = moeda["simbolo"]
         dados = mercado.get(moeda["id"])
@@ -88,12 +96,12 @@ def main():
 
         # Queda brusca (Coinbase). Se a Coinbase falhar, as outras regras continuam valendo.
         try:
-            queda_15min = calcular_queda_brusca(buscar_velas_1min(moeda["coinbase"]), agora)
+            queda_brusca = maior_queda_brusca(buscar_velas_1min(moeda["coinbase"]), desde, agora)
         except Exception as erro:
             print(f"{simbolo}: não consegui o preço minuto a minuto ({erro}).")
-            queda_15min = None
+            queda_brusca = None
 
-        indicadores = calcular_indicadores(dados, queda_15min)
+        indicadores = calcular_indicadores(dados, queda_brusca)
         quedas = quedas_detectadas(indicadores, config["limites_queda"])
         if not quedas:
             print(f"{simbolo}: nenhuma queda além dos limites.")
@@ -112,6 +120,7 @@ def main():
 
     if not so_ver:
         state.salvar(memoria)
+        state.salvar_ultima_verificacao(agora)
 
 
 if __name__ == "__main__":

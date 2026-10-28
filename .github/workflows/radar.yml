@@ -2,10 +2,11 @@ name: Radar
 
 on:
   schedule:
-    # A cada 5 minutos, para pegar quedas bruscas. Só é grátis porque o
-    # repositório é público (privado teria limite de 2.000 minutos/mês).
-    # O GitHub pode atrasar ou pular execuções em horário de pico.
-    - cron: "*/5 * * * *"
+    # A cada 15 minutos, em minutos "quebrados" (:07, :22, :37, :52) para fugir
+    # do horário de pico do GitHub, que atrasa execuções marcadas para :00 e :30.
+    # Quedas bruscas entre uma checagem e outra não escapam: o bot revê minuto a
+    # minuto todo o período desde a checagem anterior.
+    - cron: "7,22,37,52 * * * *"
   # Permite rodar na mão pela aba "Actions" do GitHub (botão "Run workflow").
   workflow_dispatch:
     inputs:

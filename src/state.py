@@ -29,3 +29,18 @@ def salvar(estado):
         for simbolo, item in estado.items()
     }
     ARQUIVO.write_text(json.dumps(bruto, indent=2), encoding="utf-8")
+
+
+ARQUIVO_ULTIMA_VERIFICACAO = ARQUIVO.parent / "ultima_verificacao.txt"
+
+
+def carregar_ultima_verificacao():
+    """Quando o bot olhou o mercado pela última vez (datetime), ou None se não sabe."""
+    if not ARQUIVO_ULTIMA_VERIFICACAO.exists():
+        return None
+    return datetime.fromisoformat(ARQUIVO_ULTIMA_VERIFICACAO.read_text(encoding="utf-8").strip())
+
+
+def salvar_ultima_verificacao(quando):
+    ARQUIVO.parent.mkdir(exist_ok=True)
+    ARQUIVO_ULTIMA_VERIFICACAO.write_text(quando.isoformat(), encoding="utf-8")

@@ -1,29 +1,50 @@
 """Regras de queda e anti-spam."""
 
+from datetime import datetime, timezone
+
 # Janela da queda brusca, em minutos.
 JANELA_BRUSCA_MINUTOS = 15
 
 
-def calcular_queda_brusca(velas_1min, agora):
-    """Quanto o preço caiu do ponto mais alto dos últimos 15 minutos até agora (em %).
+def maior_queda_brusca(velas_1min, desde, agora):
+    """Procura a maior queda dentro de 15 minutos que aconteceu entre "desde" e "agora".
+
+    Revê minuto a minuto todo o período desde a última checagem, então uma queda
+    rápida não escapa mesmo que o bot só olhe o mercado a cada 15 minutos (ou que o
+    GitHub atrase uma execução).
 
     velas_1min: velas de 1 minuto da Coinbase (mais recente primeiro).
-    Retorna None se não houver dados suficientes.
+    Retorna {"queda": -2.4, "inicio": datetime, "fim": datetime} ou None sem dados.
+    "inicio" é o minuto do pico e "fim" o minuto do fundo.
     """
-    inicio_janela = agora.timestamp() - JANELA_BRUSCA_MINUTOS * 60
-    # Cada vela: [horário, mínima, máxima, abertura, fechamento, volume]
-    recentes = [vela for vela in velas_1min if vela[0] >= inicio_janela]
-    if not recentes:
+    # Cada vela: [horário, mínima, máxima, abertura, fechamento, volume].
+    # Usamos o fechamento de cada minuto, que é menos sujeito a "picos" isolados.
+    velas = sorted(velas_1min)  # do mais antigo para o mais recente
+    janela = JANELA_BRUSCA_MINUTOS * 60
+    pior = None
+
+    for i, (horario, _min, _max, _abre, fecha, _vol) in enumerate(velas):
+        if horario < desde.timestamp() or horario > agora.timestamp():
+            continue
+        # Preço mais alto nos 15 minutos antes deste minuto (pode ser antes de "desde").
+        anteriores = [v for v in velas[: i + 1] if v[0] >= horario - janela]
+        pico = max(anteriores, key=lambda v: v[4])
+        queda = (fecha - pico[4]) / pico[4] * 100
+        if pior is None or queda < pior["queda"]:
+            pior = {"queda": queda, "inicio": pico[0], "fim": horario}
+
+    if pior is None:
         return None
-    pico = max(vela[2] for vela in recentes)
-    preco_agora = recentes[0][4]  # fechamento da vela mais recente
-    return (preco_agora - pico) / pico * 100
+    pior["inicio"] = datetime.fromtimestamp(pior["inicio"], timezone.utc)
+    pior["fim"] = datetime.fromtimestamp(pior["fim"], timezone.utc)
+    return pior
 
 
-def calcular_indicadores(dados, queda_15min):
+def calcular_indicadores(dados, queda_brusca):
     """Junta, para uma moeda, os números que as regras de queda usam.
 
-    "15min" é a queda brusca (do pico dos últimos 15 minutos até agora).
+    "15min" é a maior queda brusca (em até 15 minutos) desde a última checagem;
+    "brusca_inicio" e "brusca_fim" dizem quando ela aconteceu.
     "distancia_maxima" é quanto o preço atual está abaixo do preço mais alto
     dos últimos 7 dias (ex.: -12 quer dizer 12% abaixo).
     """
@@ -31,8 +52,11 @@ def calcular_indicadores(dados, queda_15min):
     historico_7d = (dados.get("sparkline_in_7d") or {}).get("price") or []
     maxima_7d = max(historico_7d + [preco_atual])
 
+    queda_brusca = queda_brusca or {}
     return {
-        "15min": queda_15min,
+        "15min": queda_brusca.get("queda"),
+        "brusca_inicio": queda_brusca.get("inicio"),
+        "brusca_fim": queda_brusca.get("fim"),
         "1h": dados.get("price_change_percentage_1h_in_currency"),
         "24h": dados.get("price_change_percentage_24h_in_currency"),
         "7d": dados.get("price_change_percentage_7d_in_currency"),
