@@ -114,13 +114,13 @@ def main():
     memoria = state.carregar()
     agora = datetime.now(timezone.utc)
 
-    # Período a rever em busca de movimentos bruscos: desde a última checagem
-    # (com 2 minutos de folga), limitado a no máximo 2 horas para trás.
+    # Período a rever em busca de movimentos bruscos: desde a última checagem,
+    # mas sempre pelo menos os últimos 20 minutos (a Coinbase às vezes demora a
+    # publicar os minutos mais recentes) e no máximo 2 horas para trás.
+    desde = agora - timedelta(minutes=20)
     ultima_verificacao = state.carregar_ultima_verificacao()
-    if ultima_verificacao is None:
-        desde = agora - timedelta(minutes=20)
-    else:
-        desde = max(ultima_verificacao - timedelta(minutes=2), agora - timedelta(hours=2))
+    if ultima_verificacao is not None:
+        desde = max(min(desde, ultima_verificacao), agora - timedelta(hours=2))
 
     # Índice de medo: buscado uma vez só, e apenas se algum termômetro precisar.
     medo_cache = {}
