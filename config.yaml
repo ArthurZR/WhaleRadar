@@ -1,0 +1,20 @@
+# Configurações do WhaleRadar.
+# Tudo que você pode querer ajustar fica aqui — não precisa mexer no código.
+
+# Moedas acompanhadas.
+# "id" é o nome que a CoinGecko usa; "simbolo" é como aparece na mensagem.
+moedas:
+  - id: bitcoin
+    simbolo: BTC
+  - id: ethereum
+    simbolo: ETH
+  - id: solana
+    simbolo: SOL
+
+# Moedas de referência para os preços (dólar e real).
+moedas_referencia:
+  - usd
+  - brl
+
+# Anti-spam: no máximo 1 alerta por moeda a cada X horas (usado a partir da Fase 1).
+intervalo_anti_spam_horas: 4

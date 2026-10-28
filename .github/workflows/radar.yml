@@ -1,0 +1,33 @@
+name: Radar
+
+on:
+  schedule:
+    # Fase 0: a cada 3 horas, só para confirmar que o agendamento funciona
+    # (cada execução manda uma mensagem, então 15 min seria spam).
+    # Na Fase 1, quando o bot só avisar em quedas, mudamos para "*/15 * * * *".
+    # Horários em UTC (Brasília = UTC-3).
+    - cron: "0 */3 * * *"
+  # Permite rodar na mão pela aba "Actions" do GitHub (botão "Run workflow").
+  workflow_dispatch:
+
+jobs:
+  radar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v4
+
+      - name: Instalar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Rodar o radar
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python src/main.py
