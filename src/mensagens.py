@@ -149,7 +149,7 @@ def _bloco_termometro(termometro, emojis, moeda):
         queda = formatar_numero(historico["queda_extra_com_sinal"], 0)
         linhas.append(
             f"📉 No passado, mesmo com este sinal, {moeda['simbolo']} ainda caiu uns {queda}% "
-            f"(caso típico) nos {historico['prazo_queda_extra']} seguintes. Comprar aos poucos ajuda."
+            f"(caso típico) nos {historico['prazo_queda_extra']} seguintes: é uma zona, não o fundo exato."
         )
     return linhas
 
