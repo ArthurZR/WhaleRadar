@@ -17,3 +17,9 @@ Thumbs.db
 # Saídas do backtest (geradas no GitHub)
 relatorio_backtest.md
 alertas_backtest.csv
+
+# Configuração local do editor
+.claude/
+
+# Painel gerado pelo bot (publicado pelo GitHub Actions, não vai para o repositório)
+site/

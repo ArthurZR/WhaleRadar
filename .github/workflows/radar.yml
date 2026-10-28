@@ -16,13 +16,29 @@ on:
         description: "Mandar mensagem de teste com os preços (ignora as regras de queda)"
         type: boolean
         default: false
+      painel:
+        description: "Atualizar o painel agora (normalmente é 1 vez por hora)"
+        type: boolean
+        default: false
+      resumo:
+        description: "Mandar um resumo agora (o das 9h continua saindo normalmente)"
+        type: boolean
+        default: false
 
 # Nunca roda duas vezes ao mesmo tempo (evita bagunçar a memória dos alertas).
 concurrency: radar
 
+# Permissões mínimas: ler o código e publicar o painel no GitHub Pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   radar:
     runs-on: ubuntu-latest
+    outputs:
+      painel: ${{ steps.rodar.outputs.painel }}
     steps:
       - name: Baixar o código
         uses: actions/checkout@v5
@@ -46,10 +62,11 @@ jobs:
           restore-keys: estado-
 
       - name: Rodar o radar
+        id: rodar
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python src/main.py ${{ inputs.teste && '--teste' || '' }}
+        run: python src/main.py ${{ inputs.teste && '--teste' || '' }} ${{ inputs.painel && '--painel' || '' }} ${{ inputs.resumo && '--resumo' || '' }}
 
       # Guarda a memória mesmo se algo falhou depois de um alerta já enviado.
       - name: Guardar memória dos alertas
@@ -58,3 +75,23 @@ jobs:
         with:
           path: .estado
           key: estado-${{ github.run_id }}
+
+      # Se o bot gerou um painel novo (pasta site/), empacota para publicar.
+      - name: Empacotar o painel
+        if: steps.rodar.outputs.painel == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  # Publica o painel no GitHub Pages (só quando há painel novo).
+  painel:
+    needs: radar
+    if: needs.radar.outputs.painel == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.publicar.outputs.page_url }}
+    steps:
+      - name: Publicar o painel
+        id: publicar
+        uses: actions/deploy-pages@v4

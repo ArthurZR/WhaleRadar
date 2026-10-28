@@ -1,0 +1,503 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WhaleRadar</title>
+<meta name="description" content="Painel do WhaleRadar: BTC, ETH e SOL, termômetro de compra, humor do mercado e alertas recentes.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐋</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600&family=Spectral:ital,wght@0,400;1,400;1,500&display=swap" rel="stylesheet">
+<style>
+  /* Carta náutica: papel verde-água, tinta marinho, magenta para perigo (quedas). */
+  :root {
+    --papel: #E8F0EE;
+    --raso: #D3E3E2;        /* água rasa: faixas e áreas de destaque */
+    --tinta: #12324A;
+    --tinta-suave: #4D6577;
+    --linha: #9DB4B9;       /* curvas de nível, divisórias */
+    --perigo: #B4236E;      /* quedas */
+    --abrigo: #0F7B6C;      /* altas e sinal de compra */
+    --terra: #EADFB4;       /* só no medidor de humor */
+    --serifa: "Spectral", Georgia, serif;
+    --texto: "Barlow Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --papel: #0F2232;
+      --raso: #163246;
+      --tinta: #DCE8EA;
+      --tinta-suave: #93AAB6;
+      --linha: #34536A;
+      --perigo: #F06AAE;
+      --abrigo: #4CC7B0;
+      --terra: #6E6440;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --papel: #0F2232; --raso: #163246; --tinta: #DCE8EA; --tinta-suave: #93AAB6;
+    --linha: #34536A; --perigo: #F06AAE; --abrigo: #4CC7B0; --terra: #6E6440;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--papel);
+    color: var(--tinta);
+    font: 400 1.0625rem/1.5 var(--texto);
+    font-variant-numeric: tabular-nums;
+  }
+  a { color: inherit; text-underline-offset: 3px; }
+  a:focus-visible, summary:focus-visible, button:focus-visible {
+    outline: 2px solid var(--abrigo); outline-offset: 3px; border-radius: 2px;
+  }
+
+  .carta {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 0 16px 48px;
+  }
+
+  /* Moldura graduada, como a borda de latitude de uma carta náutica. */
+  .moldura {
+    height: 8px;
+    border: 1px solid var(--tinta);
+    background: repeating-linear-gradient(90deg, var(--tinta) 0 32px, transparent 32px 64px);
+    background-clip: content-box;
+    padding: 2px 0;
+  }
+
+  /* ---------- Topo: a baleia navega até o humor do mercado ---------- */
+  .topo { padding: 28px 0 8px; }
+  .titulo {
+    font: italic 400 clamp(2.4rem, 7vw, 4.2rem)/1 var(--serifa);
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  .subtitulo { margin: 6px 0 0; color: var(--tinta-suave); max-width: 60ch; }
+
+  .mar { margin: 28px 0 4px; }
+  .mar-legenda {
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 12px; flex-wrap: wrap; margin-bottom: 8px;
+  }
+  .mar-legenda h2 { font: italic 400 1.35rem/1.2 var(--serifa); margin: 0; }
+  .mar-legenda .valor { font-weight: 600; font-size: 1.15rem; }
+  /* A baleia é o elemento de destaque: cresce com a tela, sem passar do trilho. */
+  .baleia-trilho { --tam: clamp(10px, 2.1vw, 18px); position: relative; height: calc(var(--tam) * 1.15 * 6); }
+  .baleia {
+    position: absolute; bottom: -2px; margin: 0;
+    font: 400 var(--tam)/1.15 ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    white-space: pre; color: var(--tinta);
+    transform: translateX(-50%);
+    transition: left 1.6s cubic-bezier(.2,.7,.2,1);
+  }
+  .escala {
+    position: relative; height: 14px;
+    display: grid; grid-template-columns: 25fr 20fr 11fr 20fr 24fr;
+    border: 1px solid var(--tinta);
+  }
+  .escala span:nth-child(1) { background: var(--perigo); opacity: .55; }
+  .escala span:nth-child(2) { background: var(--perigo); opacity: .25; }
+  .escala span:nth-child(3) { background: var(--raso); }
+  .escala span:nth-child(4) { background: var(--terra); opacity: .7; }
+  .escala span:nth-child(5) { background: var(--terra); }
+  .escala-nomes {
+    display: grid; grid-template-columns: 25fr 20fr 11fr 20fr 24fr;
+    font-size: .8rem; color: var(--tinta-suave); margin-top: 4px;
+  }
+  .escala-nomes span:nth-child(3) { text-align: center; }
+  .escala-nomes span:nth-child(5) { text-align: right; }
+  @media (max-width: 480px) {
+    /* Na tela estreita, só as pontas e o meio da escala. */
+    .escala-nomes span:nth-child(2), .escala-nomes span:nth-child(4) { visibility: hidden; }
+  }
+  .atualizado { font-size: .85rem; color: var(--tinta-suave); margin: 14px 0 0; }
+
+  /* ---------- Moedas ---------- */
+  .moedas {
+    display: grid; gap: 0;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    border-top: 1px solid var(--tinta);
+    margin-top: 28px;
+  }
+  .moeda { padding: 22px 20px 24px 0; }
+  .moeda + .moeda { border-left: 1px solid var(--linha); padding-left: 20px; }
+  @media (max-width: 680px) {
+    .moeda { padding-right: 0; }
+    .moeda + .moeda { border-left: 0; border-top: 1px solid var(--linha); padding-left: 0; }
+  }
+  .moeda-topo { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .moeda-topo .simbolo { font-weight: 600; font-size: 1.25rem; letter-spacing: .02em; }
+  .moeda-topo .nome { font: italic 400 1.2rem/1 var(--serifa); color: var(--tinta-suave); }
+  .moeda-topo .perfil { margin-left: auto; font-size: .85rem; color: var(--tinta-suave); }
+  .preco { font-weight: 600; font-size: clamp(2rem, 5vw, 2.5rem); line-height: 1.05; margin: 12px 0 0; }
+  .preco-brl { color: var(--tinta-suave); margin: 2px 0 0; }
+
+  .variacoes { display: flex; gap: 18px; margin: 14px 0 0; padding: 0; list-style: none; }
+  .variacoes li { display: flex; flex-direction: column; }
+  .variacoes .periodo { font-size: .8rem; color: var(--tinta-suave); }
+  .variacoes .num { font-weight: 600; }
+  .sobe { color: var(--abrigo); }
+  .desce { color: var(--perigo); }
+
+  .curva { display: block; width: 100%; height: 110px; margin: 14px 0 4px; overflow: visible; }
+  .curva .nivel { fill: none; stroke: var(--linha); stroke-width: 1; }
+  .curva .preco-linha { fill: none; stroke: var(--tinta); stroke-width: 1.6; stroke-linejoin: round; }
+  .curva .sondagem { font: italic 400 11px var(--serifa); fill: var(--tinta-suave); }
+  .curva .ponto { fill: var(--papel); stroke: var(--tinta); stroke-width: 1.2; }
+  .curva-legenda { font-size: .8rem; color: var(--tinta-suave); margin: 0; }
+
+  .termometro { margin-top: 18px; padding-top: 14px; border-top: 1px dashed var(--linha); }
+  .termometro h3 { font: italic 400 1.1rem/1.2 var(--serifa); margin: 0 0 8px; }
+  .termometro-topo { display: flex; align-items: center; gap: 12px; white-space: nowrap; }
+  .boias { display: flex; gap: 5px; }
+  .boias i {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 1.5px solid var(--tinta); display: block;
+  }
+  .boias i.cheia { background: var(--abrigo); border-color: var(--abrigo); }
+  .termometro-topo .placar { font-weight: 600; }
+  .leitura { margin: 8px 0 0; max-width: 46ch; }
+  .leitura.sinal { color: var(--abrigo); font-weight: 500; }
+  details { margin-top: 10px; }
+  summary { cursor: pointer; color: var(--tinta-suave); font-size: .92rem; width: fit-content; }
+  details ul { margin: 8px 0 0; padding: 0; list-style: none; font-size: .95rem; }
+  details li { padding: 3px 0 3px 26px; position: relative; }
+  details li::before { position: absolute; left: 0; }
+  details li.ok::before { content: "✅"; }
+  details li.nao::before { content: "❌"; }
+
+  /* ---------- Radar e diário de bordo ---------- */
+  .secao { margin-top: 44px; }
+  .secao h2 { font: italic 400 1.6rem/1.2 var(--serifa); margin: 0 0 4px; }
+  .secao .explica { margin: 0 0 16px; color: var(--tinta-suave); max-width: 64ch; }
+  .radar { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 8px 40px; }
+  .radar h3 { font-weight: 500; font-size: 1rem; margin: 0 0 6px; color: var(--tinta-suave); }
+  .lista { list-style: none; margin: 0; padding: 0; }
+  .lista li {
+    display: grid; grid-template-columns: 4.2rem 1fr auto; gap: 10px; align-items: baseline;
+    padding: 7px 0; border-bottom: 1px solid var(--linha);
+  }
+  .lista .simbolo { font-weight: 600; }
+  .lista .nome { color: var(--tinta-suave); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .diario { list-style: none; margin: 0; padding: 0; border-left: 1px solid var(--tinta); }
+  .diario li { position: relative; padding: 0 0 16px 22px; }
+  .diario li::before {
+    content: ""; position: absolute; left: -5px; top: 7px;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--papel); border: 1.5px solid var(--tinta);
+  }
+  .diario li.queda::before, .diario li.radar_queda::before { background: var(--perigo); border-color: var(--perigo); }
+  .diario li.alta::before, .diario li.radar_alta::before { background: var(--abrigo); border-color: var(--abrigo); }
+  .diario time { display: block; font-size: .85rem; color: var(--tinta-suave); }
+  .diario .marca { font-size: .85rem; color: var(--abrigo); }
+  .vazio { color: var(--tinta-suave); font-style: italic; font-family: var(--serifa); }
+
+  footer { margin-top: 48px; padding-top: 16px; color: var(--tinta-suave); font-size: .9rem; }
+  footer p { margin: 14px 0 0; max-width: 72ch; }
+  .aviso { color: var(--tinta); font-weight: 500; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .baleia { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="carta">
+  <div class="moldura" aria-hidden="true"></div>
+
+  <header class="topo">
+    <h1 class="titulo">WhaleRadar</h1>
+    <p class="subtitulo">Bitcoin, Ethereum e Solana: preço, termômetro de compra e os alertas que o bot mandou no Telegram.</p>
+
+    <section class="mar" aria-labelledby="mar-titulo">
+      <div class="mar-legenda">
+        <h2 id="mar-titulo">Humor do mercado</h2>
+        <span class="valor" id="humor-texto">carregando…</span>
+      </div>
+      <div class="baleia-trilho" aria-hidden="true">
+<pre class="baleia" id="baleia" style="left: 50%">        .
+       ":"
+     ___:____     |"\/"|
+   ,'        `.    \  /
+   |  O        \___/  |
+ ~^~^~^~^~^~^~^~^~^~^~^~^~</pre>
+      </div>
+      <div class="escala" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+      <div class="escala-nomes" aria-hidden="true">
+        <span>medo extremo</span><span>medo</span><span>neutro</span><span>ganância</span><span>euforia</span>
+      </div>
+    </section>
+    <p class="atualizado" id="atualizado"></p>
+  </header>
+
+  <main>
+    <section class="moedas" id="moedas" aria-label="Suas moedas"></section>
+
+    <section class="secao" aria-labelledby="radar-titulo">
+      <h2 id="radar-titulo">Radar das maiores moedas</h2>
+      <p class="explica">As que mais se mexeram em 24 horas, entre as maiores do mercado (sem dólares digitais e moedas com pouco volume).</p>
+      <div class="radar" id="radar"></div>
+    </section>
+
+    <section class="secao" aria-labelledby="diario-titulo">
+      <h2 id="diario-titulo">Diário de bordo</h2>
+      <p class="explica">Os alertas que o bot mandou no Telegram nos últimos 30 dias, do mais recente para o mais antigo.</p>
+      <ol class="diario" id="diario"></ol>
+    </section>
+  </main>
+
+  <footer>
+    <div class="moldura" aria-hidden="true"></div>
+    <p class="aviso">ℹ️ Informação, não recomendação de investimento.</p>
+    <p>Dados da CoinGecko, Coinbase, alternative.me (índice de medo) e Google Notícias. O painel é atualizado a cada hora; os preços, a cada 2 minutos enquanto a página estiver aberta.</p>
+    <p><a href="https://github.com/ArthurZR/WhaleRadar">Código do WhaleRadar no GitHub</a></p>
+  </footer>
+</div>
+
+<script>
+  // ---------- formatação no padrão brasileiro ----------
+  const fmtNumero = (valor, casas = 2) =>
+    valor.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });
+
+  function fmtPreco(valor) {
+    if (valor == null) return "–";
+    if (valor >= 1) return fmtNumero(valor, 2);
+    const casas = Math.max(2, -Math.floor(Math.log10(valor)) + 2);
+    return fmtNumero(valor, casas);
+  }
+
+  function fmtVariacao(valor) {
+    if (valor == null) return "–";
+    const sinal = valor > 0 ? "+" : valor < 0 ? "−" : "";
+    return `${sinal}${fmtNumero(Math.abs(valor), 1)}%`;
+  }
+
+  const classeVariacao = (valor) => (valor > 0 ? "sobe" : valor < 0 ? "desce" : "");
+
+  function haQuantoTempo(iso) {
+    const minutos = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+    if (minutos < 1) return "agora mesmo";
+    if (minutos < 60) return `há ${minutos} min`;
+    const horas = Math.floor(minutos / 60);
+    if (horas < 24) return `há ${horas} h`;
+    return `há ${Math.floor(horas / 24)} dias`;
+  }
+
+  const dataHora = (iso) =>
+    new Date(iso).toLocaleString("pt-BR", {
+      day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo",
+    });
+
+  // Cria elementos sem usar innerHTML com dados (mais seguro).
+  function el(tag, atributos = {}, ...filhos) {
+    const no = document.createElement(tag);
+    for (const [chave, valor] of Object.entries(atributos)) {
+      if (chave === "class") no.className = valor;
+      else if (chave === "text") no.textContent = valor;
+      else no.setAttribute(chave, valor);
+    }
+    for (const filho of filhos) if (filho != null) no.append(filho);
+    return no;
+  }
+
+  // ---------- humor do mercado: a baleia vai até o valor ----------
+  function desenharHumor(humor) {
+    const texto = document.getElementById("humor-texto");
+    const baleia = document.getElementById("baleia");
+    if (!humor) {
+      texto.textContent = "sem dados agora";
+      return;
+    }
+    texto.textContent = `${humor.emoji} ${humor.texto}, ${humor.valor} de 100`;
+    // A baleia não pode sair da escala: limita pelo tamanho dela.
+    const trilho = baleia.parentElement.getBoundingClientRect().width;
+    const meia = baleia.getBoundingClientRect().width / 2;
+    const posicao = Math.min(Math.max((humor.valor / 100) * trilho, meia), trilho - meia);
+    requestAnimationFrame(() => { baleia.style.left = `${posicao}px`; });
+  }
+
+  // ---------- curva de 7 dias, desenhada como curva de nível ----------
+  function desenharCurva(precos) {
+    const ns = "http://www.w3.org/2000/svg";
+    const largura = 300, altura = 100, margem = 14;
+    const svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("class", "curva");
+    svg.setAttribute("viewBox", `0 0 ${largura} ${altura}`);
+    svg.setAttribute("preserveAspectRatio", "none");
+    svg.setAttribute("role", "img");
+    if (!precos || precos.length < 2) return svg;
+
+    const min = Math.min(...precos), max = Math.max(...precos);
+    const faixa = max - min || 1;
+    const x = (i) => (i / (precos.length - 1)) * largura;
+    const y = (p) => margem + (1 - (p - min) / faixa) * (altura - 2 * margem);
+    svg.setAttribute("aria-label",
+      `Preço nos últimos 7 dias: mínima ${fmtPreco(min)}, máxima ${fmtPreco(max)} dólares.`);
+
+    // Curvas de nível de fundo, como na carta.
+    for (let k = 1; k <= 3; k++) {
+      const linha = document.createElementNS(ns, "line");
+      const altura_k = margem + (k / 4) * (altura - 2 * margem);
+      linha.setAttribute("x1", 0); linha.setAttribute("x2", largura);
+      linha.setAttribute("y1", altura_k); linha.setAttribute("y2", altura_k);
+      linha.setAttribute("class", "nivel");
+      linha.setAttribute("stroke-dasharray", "2 4");
+      linha.setAttribute("vector-effect", "non-scaling-stroke");
+      svg.append(linha);
+    }
+
+    const caminho = document.createElementNS(ns, "path");
+    caminho.setAttribute("d", precos.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p).toFixed(1)}`).join(""));
+    caminho.setAttribute("class", "preco-linha");
+    caminho.setAttribute("vector-effect", "non-scaling-stroke");
+    svg.append(caminho);
+
+    // "Sondagens": máxima e mínima marcadas na curva.
+    for (const [valor, acima] of [[max, true], [min, false]]) {
+      const i = precos.indexOf(valor);
+      const texto = document.createElementNS(ns, "text");
+      texto.setAttribute("class", "sondagem");
+      texto.setAttribute("x", Math.min(Math.max(x(i), 22), largura - 22));
+      texto.setAttribute("y", acima ? y(valor) - 5 : y(valor) + 13);
+      texto.setAttribute("text-anchor", "middle");
+      texto.textContent = fmtPreco(valor);
+      svg.append(texto);
+    }
+    return svg;
+  }
+
+  // ---------- painel de cada moeda ----------
+  function desenharMoeda(moeda) {
+    const variacoes = el("ul", { class: "variacoes" },
+      ...[["1h", moeda.var_1h], ["24h", moeda.var_24h], ["7 dias", moeda.var_7d]].map(([nome, valor]) =>
+        el("li", {},
+          el("span", { class: "periodo", text: nome }),
+          el("span", { class: `num ${classeVariacao(valor)}`, text: fmtVariacao(valor), "data-var": nome }))));
+
+    let termometro = null;
+    if (moeda.termometro) {
+      const t = moeda.termometro;
+      const boias = el("span", { class: "boias", "aria-hidden": "true" },
+        ...Array.from({ length: t.total }, (_, i) => el("i", { class: i < t.pontos ? "cheia" : "" })));
+      termometro = el("div", { class: "termometro" },
+        el("h3", { text: "Termômetro de compra" }),
+        el("div", { class: "termometro-topo" },
+          boias,
+          el("span", { class: "placar", text: `${t.pontos} de ${t.total}` })),
+        el("p", { class: `leitura ${t.interesse ? "sinal" : ""}`,
+                  text: `${t.interesse ? "🎯" : "⚠️"} ${t.leitura.charAt(0).toUpperCase()}${t.leitura.slice(1)}` }),
+        el("details", {},
+          el("summary", { text: "Ver os critérios" }),
+          el("ul", {}, ...t.itens.map((item) => el("li", { class: item.ok ? "ok" : "nao", text: item.texto })))));
+    }
+
+    return el("article", { class: "moeda", "data-id": moeda.id },
+      el("div", { class: "moeda-topo" },
+        el("span", { class: "simbolo", text: `${moeda.emoji} ${moeda.simbolo}` }),
+        el("span", { class: "nome", text: moeda.nome }),
+        el("span", { class: "perfil", text: moeda.perfil })),
+      el("p", { class: "preco", text: `US$ ${fmtPreco(moeda.preco_usd)}` }),
+      el("p", { class: "preco-brl", text: moeda.preco_brl != null ? `R$ ${fmtPreco(moeda.preco_brl)}` : "" }),
+      variacoes,
+      desenharCurva(moeda.linha_7d),
+      el("p", { class: "curva-legenda", text: "Últimos 7 dias, com a máxima e a mínima em dólar." }),
+      termometro);
+  }
+
+  // ---------- radar e diário ----------
+  function desenharRadar(radar) {
+    const alvo = document.getElementById("radar");
+    if (!radar) {
+      alvo.append(el("p", { class: "vazio", text: "O radar ainda não tem dados. Ele aparece na próxima atualização do painel." }));
+      return;
+    }
+    const lista = (titulo, itens) => el("div", {},
+      el("h3", { text: titulo }),
+      el("ul", { class: "lista" }, ...itens.map((m) =>
+        el("li", {},
+          el("span", { class: "simbolo", text: m.simbolo }),
+          el("span", { class: "nome", text: m.nome }),
+          el("span", { class: classeVariacao(m.var_24h), text: fmtVariacao(m.var_24h) })))));
+    alvo.append(lista("Mais caíram em 24h", radar.quedas), lista("Mais subiram em 24h", radar.altas));
+  }
+
+  function desenharDiario(alertas) {
+    const alvo = document.getElementById("diario");
+    if (!alertas || !alertas.length) {
+      alvo.replaceWith(el("p", { class: "vazio",
+        text: "Nenhum alerta nos últimos 30 dias. Quando algo acontecer, o aviso chega no Telegram e aparece aqui." }));
+      return;
+    }
+    for (const alerta of alertas) {
+      const marca = alerta.interesse ? el("span", { class: "marca", text: ` 🎯 termômetro ${alerta.pontos}/5` }) : null;
+      alvo.append(el("li", { class: alerta.tipo },
+        el("time", { datetime: alerta.quando, text: dataHora(alerta.quando) }),
+        el("span", { text: alerta.titulo }),
+        marca));
+    }
+  }
+
+  // ---------- preços ao vivo (CoinGecko, a cada 2 minutos) ----------
+  async function atualizarPrecos(ids) {
+    try {
+      const url = `https://api.coingecko.com/api/v3/simple/price?ids=${ids.join(",")}` +
+                  "&vs_currencies=usd,brl&include_24hr_change=true";
+      const resposta = await fetch(url);
+      if (!resposta.ok) return;
+      const precos = await resposta.json();
+      for (const [id, p] of Object.entries(precos)) {
+        const painel = document.querySelector(`.moeda[data-id="${id}"]`);
+        if (!painel) continue;
+        painel.querySelector(".preco").textContent = `US$ ${fmtPreco(p.usd)}`;
+        painel.querySelector(".preco-brl").textContent = `R$ ${fmtPreco(p.brl)}`;
+        const var24 = painel.querySelector('[data-var="24h"]');
+        var24.textContent = fmtVariacao(p.usd_24h_change);
+        var24.className = `num ${classeVariacao(p.usd_24h_change)}`;
+      }
+    } catch (erro) {
+      // Sem internet ou limite da API: mantém os valores do último painel.
+    }
+  }
+
+  // ---------- início ----------
+  async function iniciar() {
+    let dados;
+    try {
+      const resposta = await fetch(`dados.json?t=${Date.now()}`);
+      if (!resposta.ok) throw new Error(resposta.status);
+      dados = await resposta.json();
+    } catch (erro) {
+      document.getElementById("moedas").append(el("p", { class: "vazio",
+        text: "Não foi possível carregar os dados do painel. Recarregue a página em alguns minutos." }));
+      return;
+    }
+
+    desenharHumor(dados.humor);
+    const atualizado = document.getElementById("atualizado");
+    const escreverAtualizado = () => {
+      atualizado.textContent = `Painel atualizado ${haQuantoTempo(dados.atualizado_em)} (${dataHora(dados.atualizado_em)}).`;
+    };
+    escreverAtualizado();
+    setInterval(escreverAtualizado, 60000);
+
+    document.getElementById("moedas").append(...dados.moedas.map(desenharMoeda));
+    desenharRadar(dados.radar);
+    desenharDiario(dados.alertas);
+
+    const ids = dados.moedas.map((m) => m.id);
+    setInterval(() => atualizarPrecos(ids), 120000);
+    window.addEventListener("resize", () => desenharHumor(dados.humor));
+  }
+
+  iniciar();
+</script>
+</body>
+</html>

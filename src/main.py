@@ -2,22 +2,29 @@
 
 Olha BTC, ETH e SOL e manda no Telegram:
 - alerta de queda (com "por quê", notícia e termômetro de compra de 0 a 5) quando alguma cai além dos limites;
-- alerta de alta forte (com "por quê" e notícia) quando alguma sobe bem mais que o normal.
+- alerta de alta forte (com "por quê" e notícia) quando alguma sobe bem mais que o normal;
+- radar das outras moedas grandes (movimentos bem fortes, numa mensagem só);
+- resumo diário, e atualiza os dados do painel visual.
 Tudo respeitando o anti-spam e os limites do config.yaml.
 
 Como rodar (dentro da pasta do projeto):
     python src/main.py             -> verifica quedas/altas e envia os alertas
     python src/main.py --teste     -> envia uma mensagem com os preços atuais (ignora as regras)
     python src/main.py --so-ver    -> só mostra na tela, não envia nada (combina com --teste)
+    python src/main.py --painel    -> também gera o painel agora (normalmente é 1 vez por hora)
+    python src/main.py --resumo    -> manda um resumo agora (sem contar como o resumo do dia)
 """
 
 import os
+import re
 import sys
 from datetime import datetime, timedelta, timezone
+from html import unescape
 from pathlib import Path
 
 import yaml
 
+import painel
 import radar
 import state
 from alerts import (
@@ -28,7 +35,16 @@ from alerts import (
     quedas_detectadas,
 )
 from explicacao import explicar
-from mensagens import montar_alerta, montar_alerta_alta, montar_radar, montar_resumo
+from mensagens import (
+    FUSO_BRASILIA,
+    NOMES_PERIODO,
+    formatar_numero,
+    montar_alerta,
+    montar_alerta_alta,
+    montar_radar,
+    montar_resumo,
+    montar_resumo_diario,
+)
 from prices import (
     buscar_historico_diario,
     buscar_maiores,
@@ -85,7 +101,12 @@ def calcular_termometro(config, moeda, dados, velas_1min, medo, agora):
         return None
 
 
-def rodar_radar(config, memoria, agora, indicadores_todos, velas_todas, enviar, so_ver):
+def titulo_de(texto_html):
+    """Primeira linha de uma mensagem, sem as marcações HTML (para o histórico)."""
+    return unescape(re.sub(r"<[^>]+>", "", texto_html.split("\n", 1)[0])).strip()
+
+
+def rodar_radar(config, memoria, agora, indicadores_todos, velas_todas, enviar, so_ver, registrar):
     """Procura movimentos fortes nas outras moedas grandes e manda UMA mensagem com todos.
 
     Devolve a lista de moedas que passaram nos filtros (usada no resumo e no painel).
@@ -122,6 +143,15 @@ def rodar_radar(config, memoria, agora, indicadores_todos, velas_todas, enviar, 
             memoria[f"radar:{simbolo}:{achado['direcao']}"] = {
                 "quando": agora, "preco": achado["moeda"]["current_price"],
             }
+    # No histórico, cada moeda do radar vira uma linha própria.
+    for achado in achados:
+        moeda = achado["moeda"]
+        principal = achado["regras"][0]
+        verbo = "caiu" if achado["direcao"] == "queda" else "subiu"
+        titulo = (f"🛰️ {moeda['symbol'].upper()} {verbo} "
+                  f"{formatar_numero(abs(achado['indicadores'][principal]), 1)}% em {NOMES_PERIODO[principal]}")
+        registrar(f"radar_{achado['direcao']}", {"simbolo": moeda["symbol"].upper(), "emoji": "🛰️"},
+                  titulo, moeda["current_price"])
     return moedas
 
 
@@ -155,7 +185,22 @@ def main():
         return
 
     memoria = state.carregar()
+    historico = state.carregar_historico()
     agora = datetime.now(timezone.utc)
+
+    def registrar(tipo, moeda, texto, preco, termometro=None):
+        """Guarda o alerta enviado no histórico (usado pelo painel e pelo resumo diário)."""
+        if so_ver:
+            return
+        state.registrar_alerta(historico, {
+            "tipo": tipo,
+            "simbolo": moeda["simbolo"],
+            "emoji": moeda.get("emoji", ""),
+            "titulo": titulo_de(texto),
+            "preco": preco,
+            "pontos": termometro["pontos"] if termometro else None,
+            "interesse": termometro["interesse"] if termometro else None,
+        }, agora)
 
     # Período a rever em busca de movimentos bruscos: desde a última checagem,
     # mas sempre pelo menos os últimos 20 minutos (a Coinbase às vezes demora a
@@ -237,11 +282,13 @@ def main():
         else:
             termometro = calcular_termometro(config, moeda, dados, velas_1min, medo(), agora)
             explicacao = porque(moeda, quedas, "queda", indicadores)
-            enviar(montar_alerta(moeda, dados, preco_brl, indicadores, quedas, termometro, explicacao,
-                                 config["emojis"]))
+            texto = montar_alerta(moeda, dados, preco_brl, indicadores, quedas, termometro, explicacao,
+                                  config["emojis"])
+            enviar(texto)
             # Só anota na memória depois que a mensagem foi enviada com sucesso.
             if not so_ver:
                 memoria[simbolo] = {"quando": agora, "preco": preco}
+            registrar("queda", moeda, texto, preco, termometro)
 
         # --- Altas fortes (memória separada da de quedas) ---
         chave_alta = f"{simbolo}:alta"
@@ -252,21 +299,66 @@ def main():
             print(f"{simbolo}: alta detectada ({', '.join(altas)}), mas o anti-spam segurou.")
         else:
             explicacao = porque(moeda, altas, "alta", indicadores)
-            enviar(montar_alerta_alta(moeda, dados, preco_brl, indicadores, altas, explicacao, config["emojis"]))
+            texto = montar_alerta_alta(moeda, dados, preco_brl, indicadores, altas, explicacao, config["emojis"])
+            enviar(texto)
             if not so_ver:
                 memoria[chave_alta] = {"quando": agora, "preco": preco}
+            registrar("alta", moeda, texto, preco)
 
     # --- Radar das outras moedas grandes (Fase 5) ---
     radar_moedas = []
     if config["radar"]["ativo"]:
         try:
-            radar_moedas = rodar_radar(config, memoria, agora, indicadores_todos, velas_todas, enviar, so_ver)
+            radar_moedas = rodar_radar(config, memoria, agora, indicadores_todos, velas_todas, enviar, so_ver,
+                                       registrar)
         except Exception as erro:
             # O radar é um extra: se falhar, não pode atrapalhar os alertas principais.
             print(f"Radar: falhou ({erro}).")
+    movimentos = radar.maiores_movimentos(radar_moedas, 5) if radar_moedas else None
+
+    # --- Resumo diário e painel (Fase 6) ---
+    # O resumo sai uma vez por dia, a partir da hora marcada (horário de Brasília).
+    hoje = agora.astimezone(FUSO_BRASILIA)
+    resumo_cfg = config["resumo_diario"]
+    # "--resumo" manda um resumo agora (teste ou consulta), sem contar como o do dia.
+    resumo_extra = "--resumo" in sys.argv
+    resumo_do_dia = (resumo_cfg["ativo"] and hoje.hour >= resumo_cfg["hora"]
+                     and state.carregar_ultimo_resumo() != hoje.date().isoformat())
+    mandar_resumo = resumo_do_dia or resumo_extra
+    # O painel é atualizado 1 vez por hora (na primeira checagem da hora), quando sai
+    # algum alerta ou resumo, ou quando pedido com --painel.
+    alertas_agora = any(a["quando"] == agora.isoformat() for a in historico)
+    atualizar_painel = config["painel"]["ativo"] and not so_ver and (
+        agora.minute < 15 or alertas_agora or mandar_resumo or "--painel" in sys.argv
+    )
+
+    if mandar_resumo or atualizar_painel:
+        # Termômetro de todas as moedas (os dados extras só são buscados aqui).
+        termometros = {
+            moeda["simbolo"]: calcular_termometro(config, moeda, mercado[moeda["id"]],
+                                                  velas_todas.get(moeda["simbolo"], []), medo(), agora)
+            for moeda in config["moedas"] if moeda["id"] in mercado
+        }
+        if mandar_resumo:
+            enviar(montar_resumo_diario(config, mercado, precos_brl, termometros, medo(), movimentos,
+                                        historico, agora))
+            if resumo_do_dia and not so_ver:
+                state.salvar_ultimo_resumo(hoje.date().isoformat())
+        if atualizar_painel:
+            try:
+                pasta = painel.gerar(config, mercado, precos_brl, termometros, medo(), movimentos, historico, agora)
+                print(f"Painel: dados gerados em {pasta}.")
+                # Avisa o GitHub Actions que há um painel novo para publicar.
+                saida = os.environ.get("GITHUB_OUTPUT")
+                if saida:
+                    with open(saida, "a", encoding="utf-8") as f:
+                        f.write("painel=true\n")
+            except Exception as erro:
+                print(f"Painel: falhou ({erro}).")
 
     if not so_ver:
         state.salvar(memoria)
+        state.salvar_historico(historico)
         state.salvar_ultima_verificacao(agora)
 
 

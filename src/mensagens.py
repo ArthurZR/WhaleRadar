@@ -294,3 +294,75 @@ def montar_radar(achados, explicacoes, emojis, max_listadas=10):
         "menos negociadas e com movimentos mais bruscos."
     )
     return finalizar("\n".join(linhas))
+
+
+def humor_do_mercado(valor):
+    """Índice de medo e ganância (0 a 100) -> (emoji, texto em português)."""
+    if valor <= 24:
+        return "😱", "medo extremo"
+    if valor <= 44:
+        return "😟", "medo"
+    if valor <= 55:
+        return "😐", "neutro"
+    if valor <= 75:
+        return "🤑", "ganância"
+    return "🔥", "ganância extrema (euforia)"
+
+
+def montar_resumo_diario(config, mercado, precos_brl, termometros, medo, movimentos, historico, agora):
+    """Resumo do dia: preços, termômetro de cada moeda, humor do mercado, radar e alertas.
+
+    termometros: {simbolo: resultado do termometro.py ou None}.
+    movimentos: resultado de radar.maiores_movimentos (ou None).
+    historico: alertas enviados (mais recente primeiro).
+    """
+    hoje = agora.astimezone(FUSO_BRASILIA)
+    linhas = [f"<b>🐋 Bom dia! Resumo do WhaleRadar</b> ({hoje:%d/%m})", ""]
+
+    if medo:
+        emoji, texto = humor_do_mercado(medo["valor"])
+        linhas += [f"Humor do mercado: {emoji} {texto} (índice de medo {medo['valor']} de 100)", ""]
+
+    for moeda in config["moedas"]:
+        dados = mercado.get(moeda["id"])
+        if not dados:
+            continue
+        var_24h = dados.get("price_change_percentage_24h_in_currency")
+        var_7d = dados.get("price_change_percentage_7d_in_currency")
+        linha = f"{moeda['emoji']} <b>{moeda['simbolo']}</b> US$ {formatar_preco(dados['current_price'])}"
+        if moeda["id"] in precos_brl:
+            linha += f" | R$ {formatar_preco(precos_brl[moeda['id']])}"
+        linhas.append(linha)
+        if var_24h is not None and var_7d is not None:
+            linhas.append(f"   24h: {formatar_variacao(var_24h)} · 7 dias: {formatar_variacao(var_7d)}")
+        termometro = termometros.get(moeda["simbolo"])
+        if termometro:
+            emoji = config["emojis"]["zona_interesse"] if termometro["interesse"] else config["emojis"]["sem_sinal"]
+            linhas.append(f"   Termômetro: {termometro['pontos']}/{termometro['total']} {emoji} "
+                          f"{escape(termometro['leitura'], quote=False)}")
+        linhas.append("")
+
+    if movimentos:
+        def lista(itens):
+            return ", ".join(f"{m['simbolo']} {formatar_variacao(m['var_24h'])}"
+                             for m in itens if m["var_24h"] is not None)
+        linhas += [
+            "🛰️ <b>Radar 24h</b> (maiores moedas)",
+            f"   Mais caíram: {escape(lista(movimentos['quedas']), quote=False)}",
+            f"   Mais subiram: {escape(lista(movimentos['altas']), quote=False)}",
+            "",
+        ]
+
+    # Alertas enviados nas últimas 24 horas.
+    limite = agora.timestamp() - 24 * 3600
+    recentes = [a for a in historico if datetime.fromisoformat(a["quando"]).timestamp() >= limite]
+    if recentes:
+        linhas.append(f"🔔 Alertas nas últimas 24h: {len(recentes)}")
+    else:
+        linhas.append("🔔 Nenhum alerta nas últimas 24h.")
+
+    painel = config.get("painel") or {}
+    if painel.get("ativo") and painel.get("endereco"):
+        linhas.append(f"📊 <a href=\"{escape(painel['endereco'], quote=True)}\">Abrir o painel</a>")
+
+    return finalizar("\n".join(linhas))
