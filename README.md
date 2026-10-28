@@ -39,13 +39,13 @@ Bot que avisa no Telegram quando BTC, ETH e SOL caem, explica em português simp
 
 ### 4. Colocar no GitHub
 
-1. Crie um repositório **privado** chamado `whaleradar` e envie este código.
+1. Crie um repositório **público** chamado `whaleradar` e envie este código. (Público tem minutos grátis ilimitados no GitHub Actions; os segredos continuam protegidos. Nunca envie o `.env`.)
 2. No repositório: **Settings → Secrets and variables → Actions → New repository secret**. Crie dois:
    - `TELEGRAM_BOT_TOKEN`
    - `TELEGRAM_CHAT_ID`
 3. Aba **Actions → Radar → Run workflow** para rodar na hora. Marque a caixinha
    **"Mandar mensagem de teste"** para receber os preços atuais mesmo sem queda.
-4. Depois disso ele roda sozinho a cada 30 minutos e **só manda mensagem quando alguma moeda cai** além dos limites do `config.yaml`.
+4. Depois disso ele roda sozinho a cada 5 minutos e **só manda mensagem quando alguma moeda cai** além dos limites do `config.yaml` (inclusive quedas bruscas de 2% em 15 minutos).
 
 **Pronto quando:** a mensagem com os preços chega no celular, tanto rodando manualmente quanto pelo agendamento.
 
