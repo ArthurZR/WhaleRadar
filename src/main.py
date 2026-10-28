@@ -93,8 +93,9 @@ def main():
         print("\n(modo --so-ver: nada foi enviado ao Telegram)")
         return
 
-    token = os.environ.get("TELEGRAM_BOT_TOKEN")
-    chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    # .strip() remove espaços e quebras de linha coladas sem querer junto com o valor.
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
     if not token or not chat_id:
         sys.exit(
             "Faltam TELEGRAM_BOT_TOKEN e/ou TELEGRAM_CHAT_ID. "
