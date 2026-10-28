@@ -17,9 +17,9 @@ from pathlib import Path
 import yaml
 
 import state
-from alerts import calcular_indicadores, pode_alertar, quedas_detectadas
+from alerts import calcular_indicadores, calcular_queda_brusca, pode_alertar, quedas_detectadas
 from mensagens import montar_alerta, montar_resumo
-from prices import buscar_mercado, buscar_precos_brl
+from prices import buscar_mercado, buscar_precos_brl, buscar_velas_1min
 from telegram_bot import enviar_mensagem
 
 PASTA_PROJETO = Path(__file__).resolve().parent.parent
@@ -86,14 +86,22 @@ def main():
             print(f"{simbolo}: sem dados da CoinGecko agora, pulando.")
             continue
 
-        indicadores = calcular_indicadores(dados)
+        # Queda brusca (Coinbase). Se a Coinbase falhar, as outras regras continuam valendo.
+        try:
+            queda_15min = calcular_queda_brusca(buscar_velas_1min(moeda["coinbase"]), agora)
+        except Exception as erro:
+            print(f"{simbolo}: não consegui o preço minuto a minuto ({erro}).")
+            queda_15min = None
+
+        indicadores = calcular_indicadores(dados, queda_15min)
         quedas = quedas_detectadas(indicadores, config["limites_queda"])
         if not quedas:
             print(f"{simbolo}: nenhuma queda além dos limites.")
             continue
 
         preco = dados["current_price"]
-        if not pode_alertar(memoria.get(simbolo), preco, agora, config["anti_spam"]):
+        brusca = "15min" in quedas
+        if not pode_alertar(memoria.get(simbolo), preco, agora, config["anti_spam"], brusca):
             print(f"{simbolo}: queda detectada ({', '.join(quedas)}), mas o anti-spam segurou.")
             continue
 

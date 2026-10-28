@@ -23,7 +23,7 @@ ARTE_BALEIA = r"""
 """.strip("\n")
 
 # Como cada regra de queda aparece escrita.
-NOMES_PERIODO = {"1h": "1h", "24h": "24h", "7d": "7 dias"}
+NOMES_PERIODO = {"15min": "15 min", "1h": "1h", "24h": "24h", "7d": "7 dias"}
 
 
 def formatar_numero(valor, casas=2):
@@ -81,6 +81,9 @@ def montar_alerta(moeda, dados, preco_brl, indicadores, quedas):
     if principal == "distancia_maxima":
         queda = formatar_numero(abs(indicadores["distancia_maxima"]), 1)
         titulo = f"🔻 {nome} está {queda}% abaixo da máxima dos últimos 7 dias"
+    elif principal == "15min":
+        queda = formatar_numero(abs(indicadores["15min"]), 1)
+        titulo = f"⚡ {nome} despencou {queda}% em 15 min"
     else:
         queda = formatar_numero(abs(indicadores[principal]), 1)
         titulo = f"🔻 {nome} caiu {queda}% em {NOMES_PERIODO[principal]}"

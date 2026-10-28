@@ -6,19 +6,23 @@
 moedas:
   - id: bitcoin
     simbolo: BTC
+    coinbase: BTC-USD   # nome na Coinbase (preço minuto a minuto, para quedas bruscas)
     emoji: "🪙"
   - id: ethereum
     simbolo: ETH
+    coinbase: ETH-USD
     emoji: "🔷"
   - id: solana
     simbolo: SOL
+    coinbase: SOL-USD
     emoji: "🟣"
 
 # Quando avisar (perfil "alertas mais frequentes").
 # Basta UMA destas condições acontecer para a moeda gerar alerta.
 # Os números são em %, e negativos porque são quedas.
 limites_queda:
-  "1h": -3      # caiu 3% ou mais na última hora
+  "15min": -2   # queda brusca: caiu 2% ou mais em 15 minutos (do pico até agora)
+  "1h": -3     # caiu 3% ou mais na última hora
   "24h": -4     # caiu 4% ou mais nas últimas 24 horas
   "7d": -10     # caiu 10% ou mais nos últimos 7 dias
   "distancia_maxima": -10   # está 10% ou mais abaixo do preço mais alto dos últimos 7 dias
@@ -33,6 +37,10 @@ anti_spam:
   nova_queda_minima: 2
   # Depois deste tempo, a memória "zera" e qualquer queda nova volta a avisar.
   esquecer_apos_horas: 24
+  # Quedas bruscas furam o silêncio de 4h (são justamente o que você quer saber
+  # na hora), desde que o preço tenha caído mais "nova_queda_minima" desde o
+  # último alerta e já tenham passado pelo menos estes minutos.
+  intervalo_brusca_minutos: 30
 
 # Emojis usados nas mensagens.
 emojis:

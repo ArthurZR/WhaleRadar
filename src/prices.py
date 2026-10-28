@@ -4,6 +4,7 @@ import requests
 
 URL_PRECO_SIMPLES = "https://api.coingecko.com/api/v3/simple/price"
 URL_MERCADO = "https://api.coingecko.com/api/v3/coins/markets"
+URL_VELAS_COINBASE = "https://api.exchange.coinbase.com/products/{produto}/candles"
 
 
 def buscar_mercado(ids_moedas):
@@ -35,3 +36,21 @@ def buscar_precos_brl(ids_moedas):
     resposta = requests.get(URL_PRECO_SIMPLES, params=parametros, timeout=20)
     resposta.raise_for_status()
     return {id_moeda: dados["brl"] for id_moeda, dados in resposta.json().items()}
+
+
+def buscar_velas_1min(produto):
+    """Busca na Coinbase (API pública) o preço minuto a minuto das últimas horas.
+
+    produto: nome na Coinbase, ex.: "SOL-USD".
+    Cada "vela" resume 1 minuto: (horário, mínima, máxima, abertura, fechamento, volume).
+    Vem da mais recente para a mais antiga.
+    """
+    url = URL_VELAS_COINBASE.format(produto=produto)
+    resposta = requests.get(
+        url,
+        params={"granularity": 60},  # 60 segundos = velas de 1 minuto
+        headers={"User-Agent": "whaleradar"},  # a Coinbase recusa pedidos sem identificação
+        timeout=20,
+    )
+    resposta.raise_for_status()
+    return resposta.json()
