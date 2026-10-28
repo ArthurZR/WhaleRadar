@@ -1,10 +1,11 @@
 """Busca de notícias recentes no Google Notícias (RSS público, grátis, sem conta).
 
-Só aceita manchetes que falam de movimento de preço na direção certa (queda ou
-alta). Se nenhuma servir, devolve None: melhor dizer "não achei" do que mostrar
+Só aceita manchetes que citam a moeda (ou o mercado cripto) E falam de movimento de
+preço na direção certa. Se nenhuma servir, devolve None: melhor dizer "não achei" do que mostrar
 uma notícia qualquer.
 """
 
+import re
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
@@ -17,7 +18,7 @@ URL_GOOGLE_NOTICIAS = "https://news.google.com/rss/search"
 PALAVRAS = {
     "queda": [
         "cai ", "caem", "caiu", "queda", "despenc", "recua", "tomb", "derret", "desaba",
-        "perde", "afunda", "liquidaç",
+        "perde", "afunda",
         " fall", " drop", "plunge", "slide", "crash", "tumble", "sell-off", "selloff", "sink", "slump",
     ],
     "alta": [
@@ -60,17 +61,24 @@ def _buscar_rss(termo, idioma):
     return manchetes
 
 
-def buscar_noticia(termos, direcao):
+def _cita(titulo, nomes):
+    """A manchete cita algum destes nomes como palavra inteira? (ex.: 'BTC' mas não 'BTCX')"""
+    return any(re.search(rf"\b{re.escape(nome)}\b", titulo, re.IGNORECASE) for nome in nomes)
+
+
+def buscar_noticia(buscas, direcao):
     """Procura a manchete recente mais relacionada ao movimento.
 
-    termos: lista do que pesquisar, em ordem (ex.: ["Solana", "criptomoedas"]).
+    buscas: lista de (o que pesquisar, nomes que a manchete precisa citar), em
+            ordem de preferência. Ex.: [("Solana", ["Solana", "SOL"]),
+                                        ("Bitcoin", ["Bitcoin", "BTC", "cripto", "crypto"])]
     direcao: "queda" ou "alta".
     Retorna {"titulo", "fonte", "link", "quando"} ou None se nada servir.
     """
     palavras = PALAVRAS[direcao]
     agora = datetime.now(timezone.utc)
 
-    for termo in termos:
+    for termo, nomes in buscas:
         for idioma in IDIOMAS:
             try:
                 manchetes = _buscar_rss(termo, idioma)
@@ -78,8 +86,11 @@ def buscar_noticia(termos, direcao):
                 print(f"Não consegui buscar notícias de '{termo}' ({erro}).")
                 continue
 
-            # Só manchetes que falam do movimento; entre elas, a mais recente.
-            boas = [m for m in manchetes if any(p in f" {m['titulo'].lower()} " for p in palavras)]
+            # Só manchetes que citam a moeda E falam do movimento; entre elas, a mais recente.
+            boas = [
+                m for m in manchetes
+                if _cita(m["titulo"], nomes) and any(p in f" {m['titulo'].lower()} " for p in palavras)
+            ]
             boas.sort(key=lambda m: m["quando"] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
             for manchete in boas:
                 # Ignora notícias com mais de 24 horas.

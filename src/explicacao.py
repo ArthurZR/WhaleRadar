@@ -14,6 +14,10 @@ from noticias import buscar_noticia
 
 NIVEIS = ["baixa", "média", "alta"]
 
+# Palavras que indicam que a manchete fala do mercado cripto como um todo.
+NOMES_MERCADO = ["cripto", "criptomoeda", "criptomoedas", "criptoativos",
+                 "crypto", "cryptocurrency", "cryptocurrencies"]
+
 VERBOS = {
     "queda": {"um": "caiu", "varios": "caíram", "nome": "a queda"},
     "alta": {"um": "subiu", "varios": "subiram", "nome": "a alta"},
@@ -101,10 +105,12 @@ def explicar(moeda, janela, direcao, variacao_moeda, moedas, indicadores_todos, 
             certeza = 0
 
     # Notícia: primeiro sobre a própria moeda; se for movimento geral, sobre o mercado.
-    termos = [moeda["noticias"]]
+    # A manchete precisa citar a moeda (ou o mercado cripto) para valer.
+    buscas = [(moeda["noticias"][0], moeda["noticias"])]
     if mercado_todo:
-        termos.append("criptomoedas" if simbolo == "BTC" else "Bitcoin")
-    noticia = buscar_noticia(termos, direcao)
+        btc = next((m["noticias"] for m in moedas if m["simbolo"] == "BTC"), ["Bitcoin"])
+        buscas.append(("criptomoedas" if simbolo == "BTC" else btc[0], btc + NOMES_MERCADO))
+    noticia = buscar_noticia(buscas, direcao)
     if noticia:
         certeza = min(certeza + 1, len(NIVEIS) - 1)
 
