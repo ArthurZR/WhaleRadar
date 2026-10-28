@@ -1,26 +1,28 @@
 """Ponto de entrada do WhaleRadar.
 
-Fase 0: busca os preços de BTC, ETH e SOL e manda uma mensagem de teste no Telegram.
+Fase 1: olha BTC, ETH e SOL e manda um alerta no Telegram quando alguma cai além
+dos limites do config.yaml (respeitando o anti-spam).
 
 Como rodar (dentro da pasta do projeto):
-    python src/main.py            -> busca preços e envia para o Telegram
-    python src/main.py --so-ver   -> só mostra a mensagem na tela, não envia nada
+    python src/main.py             -> verifica quedas e envia os alertas
+    python src/main.py --teste     -> envia uma mensagem com os preços atuais (ignora as regras)
+    python src/main.py --so-ver    -> só mostra na tela, não envia nada (combina com --teste)
 """
 
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
 
-from prices import buscar_precos
+import state
+from alerts import calcular_indicadores, pode_alertar, quedas_detectadas
+from mensagens import montar_alerta, montar_resumo
+from prices import buscar_mercado, buscar_precos_brl
 from telegram_bot import enviar_mensagem
 
 PASTA_PROJETO = Path(__file__).resolve().parent.parent
-
-# Horário de Brasília (UTC-3), para mostrar a hora certa na mensagem.
-FUSO_BRASILIA = timezone(timedelta(hours=-3))
 
 
 def carregar_env():
@@ -45,65 +47,63 @@ def carregar_config():
         return yaml.safe_load(f)
 
 
-def formatar_numero(valor, casas=2):
-    """Formata no padrão brasileiro: 1234567.8 -> '1.234.567,80'."""
-    texto = f"{valor:,.{casas}f}"  # vira '1,234,567.80'
-    return texto.replace(",", "X").replace(".", ",").replace("X", ".")
-
-
-def montar_mensagem(config, precos):
-    agora = datetime.now(FUSO_BRASILIA).strftime("%d/%m/%Y %H:%M")
-    linhas = [f"🐋 WhaleRadar — preços agora ({agora})", ""]
-
-    for moeda in config["moedas"]:
-        dados = precos.get(moeda["id"])
-        if not dados:
-            linhas.append(f"{moeda['simbolo']}: preço indisponível no momento")
-            continue
-
-        variacao = dados.get("usd_24h_change")
-        if variacao is None:
-            texto_variacao = ""
-        else:
-            seta = "🔻" if variacao < 0 else "🔺"
-            texto_variacao = f"  {seta} {formatar_numero(variacao, 1)}% em 24h"
-
-        linhas.append(
-            f"{moeda['simbolo']}: US$ {formatar_numero(dados['usd'])}"
-            f" | R$ {formatar_numero(dados['brl'])}{texto_variacao}"
-        )
-
-    linhas += ["", "ℹ️ Informação, não recomendação de investimento."]
-    return "\n".join(linhas)
-
-
 def main():
+    modo_teste = "--teste" in sys.argv
     so_ver = "--so-ver" in sys.argv
 
     carregar_env()
     config = carregar_config()
 
-    ids = [m["id"] for m in config["moedas"]]
-    precos = buscar_precos(ids, config["moedas_referencia"])
-    mensagem = montar_mensagem(config, precos)
-
-    print(mensagem)
-
-    if so_ver:
-        print("\n(modo --so-ver: nada foi enviado ao Telegram)")
-        return
-
     # .strip() remove espaços e quebras de linha coladas sem querer junto com o valor.
     token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
     chat_id = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
-    if not token or not chat_id:
+    if not so_ver and (not token or not chat_id):
         sys.exit(
             "Faltam TELEGRAM_BOT_TOKEN e/ou TELEGRAM_CHAT_ID. "
             "Preencha o arquivo .env (veja .env.example) ou os Secrets do GitHub."
         )
 
-    enviar_mensagem(token, chat_id, mensagem)
-    print("\n✅ Mensagem enviada ao Telegram.")
+    ids = [m["id"] for m in config["moedas"]]
+    mercado = buscar_mercado(ids)
+    precos_brl = buscar_precos_brl(ids)
+
+    def enviar(texto):
+        print(texto, "\n")
+        if not so_ver:
+            enviar_mensagem(token, chat_id, texto)
+
+    if modo_teste:
+        enviar(montar_resumo(config, mercado, precos_brl))
+        return
+
+    memoria = state.carregar()
+    agora = datetime.now(timezone.utc)
+
+    for moeda in config["moedas"]:
+        simbolo = moeda["simbolo"]
+        dados = mercado.get(moeda["id"])
+        if not dados:
+            print(f"{simbolo}: sem dados da CoinGecko agora, pulando.")
+            continue
+
+        indicadores = calcular_indicadores(dados)
+        quedas = quedas_detectadas(indicadores, config["limites_queda"])
+        if not quedas:
+            print(f"{simbolo}: nenhuma queda além dos limites.")
+            continue
+
+        preco = dados["current_price"]
+        if not pode_alertar(memoria.get(simbolo), preco, agora, config["anti_spam"]):
+            print(f"{simbolo}: queda detectada ({', '.join(quedas)}), mas o anti-spam segurou.")
+            continue
+
+        enviar(montar_alerta(moeda, dados, precos_brl.get(moeda["id"]), indicadores, quedas))
+        # Só anota na memória depois que a mensagem foi enviada com sucesso.
+        if not so_ver:
+            memoria[simbolo] = {"quando": agora, "preco": preco}
+
+    if not so_ver:
+        state.salvar(memoria)
 
 
 if __name__ == "__main__":

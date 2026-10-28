@@ -2,23 +2,30 @@ name: Radar
 
 on:
   schedule:
-    # Fase 0: a cada 3 horas, só para confirmar que o agendamento funciona
-    # (cada execução manda uma mensagem, então 15 min seria spam).
-    # Na Fase 1, quando o bot só avisar em quedas, mudamos para "*/15 * * * *".
-    # Horários em UTC (Brasília = UTC-3).
-    - cron: "0 */3 * * *"
+    # A cada 30 minutos (horários em UTC).
+    # Por que não 15? Repositório privado tem 2.000 minutos grátis/mês e cada
+    # execução conta como 1 minuto: a cada 15 min daria ~2.900 min/mês.
+    - cron: "*/30 * * * *"
   # Permite rodar na mão pela aba "Actions" do GitHub (botão "Run workflow").
   workflow_dispatch:
+    inputs:
+      teste:
+        description: "Mandar mensagem de teste com os preços (ignora as regras de queda)"
+        type: boolean
+        default: false
+
+# Nunca roda duas vezes ao mesmo tempo (evita bagunçar a memória dos alertas).
+concurrency: radar
 
 jobs:
   radar:
     runs-on: ubuntu-latest
     steps:
       - name: Baixar o código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Instalar Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
           cache: pip
@@ -26,8 +33,25 @@ jobs:
       - name: Instalar dependências
         run: pip install -r requirements.txt
 
+      # A memória do anti-spam (pasta .estado) é guardada no cache do GitHub
+      # entre uma execução e outra. Aqui pegamos a versão mais recente.
+      - name: Recuperar memória dos alertas
+        uses: actions/cache/restore@v4
+        with:
+          path: .estado
+          key: estado-${{ github.run_id }}
+          restore-keys: estado-
+
       - name: Rodar o radar
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python src/main.py
+        run: python src/main.py ${{ inputs.teste && '--teste' || '' }}
+
+      # Guarda a memória mesmo se algo falhou depois de um alerta já enviado.
+      - name: Guardar memória dos alertas
+        if: always() && hashFiles('.estado/*') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .estado
+          key: estado-${{ github.run_id }}

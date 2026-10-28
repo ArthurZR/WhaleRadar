@@ -9,6 +9,8 @@ def enviar_mensagem(token, chat_id, texto):
     dados = {
         "chat_id": chat_id,
         "text": texto,
+        # Permite <b>negrito</b> e <pre>texto de largura fixa</pre> na mensagem.
+        "parse_mode": "HTML",
         # Evita que links na mensagem virem "cartões" grandes no Telegram.
         "disable_web_page_preview": True,
     }

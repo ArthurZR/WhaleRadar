@@ -10,3 +10,6 @@ venv/
 # Sistema
 .DS_Store
 Thumbs.db
+
+# Memória local do anti-spam
+.estado/

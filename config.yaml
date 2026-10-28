@@ -6,15 +6,36 @@
 moedas:
   - id: bitcoin
     simbolo: BTC
+    emoji: "🪙"
   - id: ethereum
     simbolo: ETH
+    emoji: "🔷"
   - id: solana
     simbolo: SOL
+    emoji: "🟣"
 
-# Moedas de referência para os preços (dólar e real).
-moedas_referencia:
-  - usd
-  - brl
+# Quando avisar (perfil "alertas mais frequentes").
+# Basta UMA destas condições acontecer para a moeda gerar alerta.
+# Os números são em %, e negativos porque são quedas.
+limites_queda:
+  "1h": -3      # caiu 3% ou mais na última hora
+  "24h": -4     # caiu 4% ou mais nas últimas 24 horas
+  "7d": -10     # caiu 10% ou mais nos últimos 7 dias
+  "distancia_maxima": -10   # está 10% ou mais abaixo do preço mais alto dos últimos 7 dias
 
-# Anti-spam: no máximo 1 alerta por moeda a cada X horas (usado a partir da Fase 1).
-intervalo_anti_spam_horas: 4
+# Anti-spam: evita que a mesma moeda fique avisando sem parar.
+anti_spam:
+  # Depois de um alerta, a mesma moeda fica em silêncio por pelo menos este tempo.
+  intervalo_horas: 4
+  # Passado esse tempo, só avisa de novo se o preço caiu MAIS este tanto (%)
+  # desde o último alerta. Assim não chega o mesmo aviso repetido quando o preço
+  # fica parado lá embaixo.
+  nova_queda_minima: 2
+  # Depois deste tempo, a memória "zera" e qualquer queda nova volta a avisar.
+  esquecer_apos_horas: 24
+
+# Emojis usados nas mensagens.
+emojis:
+  noticia: "🌍"          # antes da notícia / explicação do motivo (Fase 3)
+  zona_interesse: "🎯"   # quando a leitura indica possível zona de compra (Fase 2)
+  sem_sinal: "⚠️"        # quando a leitura NÃO indica zona de compra (Fase 2)

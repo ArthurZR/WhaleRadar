@@ -1,4 +1,31 @@
-"""Memória do bot: guarda quando foi o último alerta de cada moeda.
+"""Memória do bot: guarda quando foi o último alerta de cada moeda (e a que preço).
 
-Ainda vazio: será preenchido na Fase 1 (junto com o anti-spam).
+Fica num arquivo JSON na pasta .estado/. No GitHub Actions essa pasta é guardada
+entre uma execução e outra (veja o radar.yml), senão o bot "esqueceria" tudo.
 """
+
+import json
+from datetime import datetime
+from pathlib import Path
+
+ARQUIVO = Path(__file__).resolve().parent.parent / ".estado" / "ultimos_alertas.json"
+
+
+def carregar():
+    """Retorna {"SOL": {"quando": datetime, "preco": 102.1}, ...} (vazio se não houver memória)."""
+    if not ARQUIVO.exists():
+        return {}
+    bruto = json.loads(ARQUIVO.read_text(encoding="utf-8"))
+    return {
+        simbolo: {"quando": datetime.fromisoformat(item["quando"]), "preco": item["preco"]}
+        for simbolo, item in bruto.items()
+    }
+
+
+def salvar(estado):
+    ARQUIVO.parent.mkdir(exist_ok=True)
+    bruto = {
+        simbolo: {"quando": item["quando"].isoformat(), "preco": item["preco"]}
+        for simbolo, item in estado.items()
+    }
+    ARQUIVO.write_text(json.dumps(bruto, indent=2), encoding="utf-8")
