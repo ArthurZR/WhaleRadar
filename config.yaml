@@ -21,7 +21,7 @@ moedas:
 # Basta UMA destas condições acontecer para a moeda gerar alerta.
 # Os números são em %, e negativos porque são quedas.
 limites_queda:
-  "15min": -2   # queda brusca: caiu 2% ou mais em 15 minutos (do pico até agora)
+  "15min": -2   # queda brusca: caiu 2% ou mais em até 15 minutos, desde a última checagem
   "1h": -3     # caiu 3% ou mais na última hora
   "24h": -4     # caiu 4% ou mais nas últimas 24 horas
   "7d": -10     # caiu 10% ou mais nos últimos 7 dias
