@@ -78,7 +78,10 @@ def detectar(moedas, regras, memoria, agora):
 
 def maiores_movimentos(moedas, quantas=3):
     """As que mais caíram e mais subiram em 24h (para o resumo diário e o painel)."""
-    ordenadas = sorted(moedas, key=lambda m: m.get("price_change_percentage_24h_in_currency") or 0)
+    def variacao(m):
+        return m.get("price_change_percentage_24h_in_currency") or 0
+
+    ordenadas = sorted(moedas, key=variacao)
 
     def resumir(m):
         return {
@@ -89,7 +92,8 @@ def maiores_movimentos(moedas, quantas=3):
             "var_24h": m.get("price_change_percentage_24h_in_currency"),
         }
 
+    # Só entram quedas de verdade em "quedas" e altas de verdade em "altas".
     return {
-        "quedas": [resumir(m) for m in ordenadas[:quantas]],
-        "altas": [resumir(m) for m in reversed(ordenadas[-quantas:])],
+        "quedas": [resumir(m) for m in ordenadas if variacao(m) < 0][:quantas],
+        "altas": [resumir(m) for m in reversed(ordenadas) if variacao(m) > 0][:quantas],
     }

@@ -344,8 +344,9 @@ def montar_resumo_diario(config, mercado, precos_brl, termometros, medo, movimen
 
     if movimentos:
         def lista(itens):
-            return ", ".join(f"{m['simbolo']} {formatar_variacao(m['var_24h'])}"
-                             for m in itens if m["var_24h"] is not None)
+            texto = ", ".join(f"{m['simbolo']} {formatar_variacao(m['var_24h'])}"
+                              for m in itens if m["var_24h"] is not None)
+            return texto or "nenhuma"
         linhas += [
             "🛰️ <b>Radar 24h</b> (maiores moedas)",
             f"   Mais caíram: {escape(lista(movimentos['quedas']), quote=False)}",

@@ -419,14 +419,16 @@
       alvo.append(el("p", { class: "vazio", text: "O radar ainda não tem dados. Ele aparece na próxima atualização do painel." }));
       return;
     }
-    const lista = (titulo, itens) => el("div", {},
+    const lista = (titulo, itens, vazio) => el("div", {},
       el("h3", { text: titulo }),
+      itens.length ? null : el("p", { class: "vazio", text: vazio }),
       el("ul", { class: "lista" }, ...itens.map((m) =>
         el("li", {},
           el("span", { class: "simbolo", text: m.simbolo }),
           el("span", { class: "nome", text: m.nome }),
           el("span", { class: classeVariacao(m.var_24h), text: fmtVariacao(m.var_24h) })))));
-    alvo.append(lista("Mais caíram em 24h", radar.quedas), lista("Mais subiram em 24h", radar.altas));
+    alvo.append(lista("Mais caíram em 24h", radar.quedas, "Nenhuma das maiores moedas caiu em 24h."),
+                lista("Mais subiram em 24h", radar.altas, "Nenhuma das maiores moedas subiu em 24h."));
   }
 
   function desenharDiario(alertas) {
