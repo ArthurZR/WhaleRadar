@@ -13,3 +13,7 @@ Thumbs.db
 
 # Memória local do anti-spam
 .estado/
+
+# Saídas do backtest (geradas no GitHub)
+relatorio_backtest.md
+alertas_backtest.csv

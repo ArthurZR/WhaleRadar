@@ -1,0 +1,42 @@
+name: Backtest
+
+# Testa as regras do config.yaml nos preços do passado.
+# Só roda quando você manda: aba "Actions" → "Backtest" → "Run workflow".
+on:
+  workflow_dispatch:
+    inputs:
+      anos:
+        description: "Quantos anos para trás testar"
+        default: "2"
+
+jobs:
+  backtest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v5
+
+      - name: Instalar Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Rodar o backtest
+        run: python src/backtest.py --anos "${{ inputs.anos }}"
+
+      # O relatório aparece na página da execução (aba "Summary").
+      - name: Mostrar relatório
+        run: cat relatorio_backtest.md >> "$GITHUB_STEP_SUMMARY"
+
+      # Relatório + planilha com cada alerta, para baixar.
+      - name: Guardar arquivos
+        uses: actions/upload-artifact@v4
+        with:
+          name: backtest
+          path: |
+            relatorio_backtest.md
+            alertas_backtest.csv
