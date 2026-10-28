@@ -45,7 +45,7 @@ Bot que avisa no Telegram quando BTC, ETH e SOL caem, explica em português simp
    - `TELEGRAM_CHAT_ID`
 3. Aba **Actions → Radar → Run workflow** para rodar na hora. Marque a caixinha
    **"Mandar mensagem de teste"** para receber os preços atuais mesmo sem queda.
-4. Depois disso ele roda sozinho a cada 15 minutos e **só manda mensagem quando alguma moeda cai** além dos limites do `config.yaml` (inclusive quedas bruscas de 2% em 15 minutos, mesmo que aconteçam entre uma checagem e outra).
+4. Depois disso ele roda sozinho a cada 15 minutos e **só manda mensagem quando alguma moeda cai ou sobe forte** além dos limites do `config.yaml` (inclusive movimentos bruscos de 2% em 15 minutos, mesmo que aconteçam entre uma checagem e outra). Todo alerta de queda vem com um **termômetro de compra de 0 a 5**, com critérios diferentes para quem segura a longo prazo (BTC, ETH) e para quem compra e vende (SOL).
 
 **Pronto quando:** a mensagem com os preços chega no celular, tanto rodando manualmente quanto pelo agendamento.
 

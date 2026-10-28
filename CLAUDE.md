@@ -42,6 +42,7 @@ whaleradar/
 │   ├── alerts.py          # regras de queda e anti-spam
 │   ├── telegram_bot.py    # envio de mensagens
 │   ├── mensagens.py       # monta o texto das mensagens (emojis, arte da baleia)
+│   ├── termometro.py      # termômetro de compra 0 a 5 (longo e curto prazo)
 │   └── state.py           # guarda último alerta de cada moeda (.estado/, no cache do Actions)
 └── .github/workflows/
     └── radar.yml          # agendamento
@@ -50,8 +51,8 @@ whaleradar/
 ## Roteiro por fases
 
 - **Fase 0 – Fundação (feita):** repositório, bot do Telegram, chaves, workflow agendado, mensagem de teste chegando no celular.
-- **Fase 1 – Detector de queda (implementada em 28/10/2026, aguardando primeira queda real):** alerta por queda em 15 min / 1h / 24h / 7d e distância da máxima de 7 dias, com anti-spam. Limites no perfil "frequente" (-2% 15 min, -3% 1h, -4% 24h, -10% 7d, -10% da máxima). A queda brusca usa velas de 1 minuto da Coinbase (API pública): a cada execução o bot revê todo o período desde a checagem anterior (guardada em `.estado/ultima_verificacao.txt`) e pega a pior queda dentro de 15 min, então nada escapa entre checagens. Ela fura o silêncio de 4h (mínimo 30 min + preço 2% abaixo do último alerta). Roda a cada 15 min, disparado no horário exato pelo **cron-job.org** (conta do Arthur, chama a API `workflow_dispatch` com um token fine-grained só com Actions: write no WhaleRadar; **o token vence em 27/11/2026**, renovar com "Regenerate token" e colar no cron-job.org). O cron do próprio GitHub ficou como reserva, 1x/hora no minuto 41; o repositório é **público** para ter minutos grátis ilimitados (decisão do Arthur, 28/10/2026). Commits usam o e-mail anônimo do GitHub, nunca o pessoal.
-- **Fase 2 – Termômetro de compra:** placar 0 a 5 (preço barato vs histórico, medo extremo, RSI), cada ponto explicado.
+- **Fase 1 – Detector de queda (feita em 28/10/2026):** alerta por queda em 15 min / 1h / 24h / 7d e distância da máxima de 7 dias, com anti-spam. Limites no perfil "frequente" (-2% 15 min, -3% 1h, -4% 24h, -10% 7d, -10% da máxima). A queda brusca usa velas de 1 minuto da Coinbase (API pública): a cada execução o bot revê todo o período desde a checagem anterior (guardada em `.estado/ultima_verificacao.txt`) e pega a pior queda dentro de 15 min, então nada escapa entre checagens. Ela fura o silêncio de 4h (mínimo 30 min + preço 2% abaixo do último alerta). Roda a cada 15 min, disparado no horário exato pelo **cron-job.org** (conta do Arthur, chama a API `workflow_dispatch` com um token fine-grained só com Actions: write no WhaleRadar; **o token vence em 27/11/2026**, renovar com "Regenerate token" e colar no cron-job.org). O cron do próprio GitHub ficou como reserva, 1x/hora no minuto 41; o repositório é **público** para ter minutos grátis ilimitados (decisão do Arthur, 28/10/2026). Commits usam o e-mail anônimo do GitHub, nunca o pessoal.
+- **Fase 2 – Termômetro de compra (feita em 28/10/2026):** placar 0 a 5 em todo alerta de queda (`src/termometro.py`), com perfil por moeda no `config.yaml`. **BTC e ETH = longo_prazo** (comprar e segurar): média de 200 dias, ≥20% abaixo da máxima anual, medo ≤40, RSI diário <35, sem nova mínima há 6h. **SOL = curto_prazo** (comprar e vender): RSI 1h <30, ≥8% abaixo da média de 7 dias, medo ≤40, volume 3h ≥50% acima do normal, repique ≥1% do fundo de 2h. 3+ pontos = 🎯, senão ⚠️; o último critério de cada perfil é o "freio" (se falhar, a leitura avisa que ainda não parou de cair). Dados extras (histórico diário CoinGecko, velas de 1h Coinbase, Fear & Greed) só são buscados quando há alerta. Também há **alertas de alta forte** (🚀) para as 3 moedas, pedido do Arthur: +2% 15 min, +3% 1h, +6% 24h, +15% 7d, com memória de anti-spam separada (chave `SIMBOLO:alta`), sem termômetro.
 - **Fase 3 – "Por que caiu?":** notícias, movimento do BTC/mercado e liquidações resumidos em linguagem simples, com nível de certeza.
 - **Fase 4 – Backtest:** testar as regras em dados históricos e ajustar critérios com números.
 - **Fase 5 – Radar de outras moedas:** varrer as ~50 maiores com filtros de liquidez e segurança.
@@ -77,7 +78,7 @@ whaleradar/
 - Emoji antes de cada moeda: BTC 🪙, ETH 🔷, SOL 🟣 (em `config.yaml`).
 - Toda mensagem termina com o aviso e a arte ASCII da baleia em `<code>` (não `<pre>`: o Arthur não gostou do quadro com "copy") (em `src/mensagens.py`). Mensagens são enviadas com `parse_mode=HTML`: escapar texto dinâmico.
 - 🌍 antes da notícia / explicação do motivo (Fase 3).
-- 🎯 quando a leitura indica possível zona de compra; ⚠️ quando não indica (Fase 2). Continua sendo "leitura", nunca "recomendação".
+- 🎯 quando a leitura indica possível zona de compra; ⚠️ quando não indica. 🚀 nos alertas de alta forte; ⚡ em movimentos bruscos. Continua sendo "leitura", nunca "recomendação".
 
 ## Formato-alvo da mensagem (a partir da Fase 2/3)
 
@@ -96,7 +97,7 @@ Termômetro de compra: 3/5
 ## Decisões em aberto (perguntar ao usuário antes da fase indicada)
 
 - **Fase 3:** usar a API da Anthropic para escrever os "porquês"? (custo baixo, centavos por alerta) ou modelo de texto fixo?
-- **Fase 2:** perfil do usuário: comprar e segurar a longo prazo, ou operar movimentos curtos? Muda os critérios do termômetro.
+- ~~**Fase 2:** perfil do usuário~~ → decidido: BTC comprar e segurar; ETH segurar e comprar mais em quedas (mesmo termômetro do BTC); SOL comprar e vender (28/10/2026).
 - ~~**Fase 1:** sensibilidade dos alertas~~ → decidido: **mais frequentes** (28/10/2026).
 
 ## Convenções de trabalho
