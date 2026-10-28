@@ -271,6 +271,30 @@ def gerar_relatorio(config, resultados, inicio, fim, anos):
             "",
         ]
 
+    # Números que o bot usa nas mensagens (bloco "historico" de cada moeda no config.yaml).
+    linhas += [
+        "## Valores para o config.yaml",
+        "",
+        "Copie para o bloco `historico` de cada moeda, para as mensagens usarem os números deste backtest:",
+        "",
+        "```yaml",
+    ]
+    for moeda in config["moedas"]:
+        alertas, _referencia = resultados[moeda["simbolo"]]
+        com_sinal = [a["queda_extra"] for a in alertas
+                     if a["tipo"] == "queda" and a["interesse"] and a["queda_extra"] is not None]
+        _, altas_subiram, _ = resumo([a for a in alertas if a["tipo"] == "alta"], "7 dias")
+        queda_extra = abs(statistics.median(com_sinal)) if com_sinal else None
+        prazo = f"{JANELA_QUEDA_EXTRA[moeda['perfil']] // 24} dias"
+        linhas += [
+            f"# {moeda['simbolo']}",
+            "historico:",
+            f"  queda_extra_com_sinal: {queda_extra:.1f}" if queda_extra is not None else "  queda_extra_com_sinal: null",
+            f"  prazo_queda_extra: {prazo}",
+            f"  altas_seguiram_subindo: {altas_subiram:.0f}" if altas_subiram is not None else "  altas_seguiram_subindo: null",
+        ]
+    linhas += ["```", ""]
+
     linhas += [
         "## Limitações",
         "",

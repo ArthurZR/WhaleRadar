@@ -10,18 +10,32 @@ moedas:
     emoji: "🪙"
     noticias: [Bitcoin, BTC]   # 1º = termo pesquisado no Google Notícias; a manchete precisa citar um destes
     perfil: longo_prazo   # comprar e segurar (veja "termometro" lá embaixo)
+    # Números do backtest (28/10/2026, 2 anos). Depois de rodar um backtest novo,
+    # copie os valores da seção "Valores para o config.yaml" do relatório.
+    historico:
+      queda_extra_com_sinal: 8.2   # % que o preço ainda caiu, no caso típico, depois de um 🎯
+      prazo_queda_extra: 30 dias
+      altas_seguiram_subindo: 63   # % das altas fortes em que o preço estava mais alto 7 dias depois
   - id: ethereum
     simbolo: ETH
     coinbase: ETH-USD
     emoji: "🔷"
     noticias: [Ethereum, Ether, ETH]
     perfil: longo_prazo   # segurar, comprando mais em quedas fortes
+    historico:
+      queda_extra_com_sinal: 15.4
+      prazo_queda_extra: 30 dias
+      altas_seguiram_subindo: 50
   - id: solana
     simbolo: SOL
     coinbase: SOL-USD
     emoji: "🟣"
     noticias: [Solana, SOL]
     perfil: curto_prazo   # comprar e vender
+    historico:
+      queda_extra_com_sinal: 3.2
+      prazo_queda_extra: 3 dias
+      altas_seguiram_subindo: 46
 
 # Quando avisar (perfil "alertas mais frequentes").
 # Basta UMA destas condições acontecer para a moeda gerar alerta.
@@ -65,7 +79,7 @@ anti_spam:
 termometro:
   # Comprar e segurar: olha se está barato em meses e anos.
   longo_prazo:
-    pontos_para_interesse: 3
+    pontos_para_interesse: 4     # backtest (28/10/2026): com 3 pontos o resultado em 90 dias foi fraco; com 4+, bem melhor
     dias_media: 200              # 1) preço abaixo da média dos últimos 200 dias
     queda_da_maxima_anual: -20   # 2) 20% ou mais abaixo da máxima do último ano
     medo_maximo: 40              # 3) índice de medo e ganância em 40 ou menos

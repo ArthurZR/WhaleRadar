@@ -134,14 +134,40 @@ def _bloco_porque(explicacao, emojis):
     return linhas
 
 
-def _bloco_termometro(termometro, emojis):
+def _bloco_termometro(termometro, emojis, moeda):
     """Placar do termômetro de compra, com cada ponto explicado."""
     linhas = [f"<b>Termômetro de compra: {termometro['pontos']}/{termometro['total']}</b>"]
     for ok, texto in termometro["itens"]:
         linhas.append(f"{'✅' if ok else '❌'} {escape(texto, quote=False)}")
     emoji = emojis["zona_interesse"] if termometro["interesse"] else emojis["sem_sinal"]
     linhas.append(f"{emoji} <b>Leitura:</b> {escape(termometro['leitura'], quote=False)}")
+
+    # Com sinal, lembra que no passado o preço ainda costumou cair um pouco mais
+    # (números do backtest, no config.yaml): é uma zona, não o fundo exato.
+    historico = moeda.get("historico") or {}
+    if termometro["interesse"] and historico.get("queda_extra_com_sinal"):
+        queda = formatar_numero(historico["queda_extra_com_sinal"], 0)
+        linhas.append(
+            f"📉 No passado, mesmo com este sinal, {moeda['simbolo']} ainda caiu uns {queda}% "
+            f"(caso típico) nos {historico['prazo_queda_extra']} seguintes. Comprar aos poucos ajuda."
+        )
     return linhas
+
+
+def _frase_altas(moeda):
+    """O que costumou acontecer depois de altas fortes desta moeda (backtest)."""
+    subiram = (moeda.get("historico") or {}).get("altas_seguiram_subindo")
+    if subiram is None:
+        return "Alta bem mais forte que o normal."
+    simbolo = moeda["simbolo"]
+    if subiram >= 58:
+        return (f"No passado, altas assim costumaram continuar: em {subiram:.0f}% dos casos "
+                f"{simbolo} estava ainda mais alto 7 dias depois.")
+    if subiram <= 42:
+        return (f"No passado, altas assim costumaram devolver parte do ganho: só em {subiram:.0f}% "
+                f"dos casos {simbolo} estava mais alto 7 dias depois.")
+    return (f"No passado, depois de altas assim, {simbolo} subiu ou caiu meio a meio "
+            f"nos 7 dias seguintes ({subiram:.0f}% subiram).")
 
 
 def montar_alerta(moeda, dados, preco_brl, indicadores, quedas, termometro, explicacao, emojis):
@@ -176,7 +202,7 @@ def montar_alerta(moeda, dados, preco_brl, indicadores, quedas, termometro, expl
 
     linhas.append("")
     if termometro:
-        linhas += _bloco_termometro(termometro, emojis)
+        linhas += _bloco_termometro(termometro, emojis, moeda)
     else:
         linhas.append(f"{emojis['sem_sinal']} Termômetro de compra indisponível agora (falha ao buscar dados).")
 
@@ -211,6 +237,6 @@ def montar_alerta_alta(moeda, dados, preco_brl, indicadores, altas, explicacao, 
         "Variação:",
         *_painel(indicadores, altas, alta=True),
         "",
-        "Alta bem mais forte que o normal. Movimentos assim às vezes devolvem parte do ganho logo depois.",
+        _frase_altas(moeda),
     ]
     return finalizar("\n".join(linhas))
