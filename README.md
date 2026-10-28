@@ -54,3 +54,21 @@ Bot que avisa no Telegram quando BTC, ETH e SOL caem, explica em português simp
 ## Ajustes
 
 Tudo que dá para mudar sem mexer no código está em [`config.yaml`](config.yaml).
+
+## Despertador (cron-job.org)
+
+O agendamento do GitHub atrasa. Por isso quem manda o bot rodar a cada 15 minutos,
+no horário exato, é o [cron-job.org](https://cron-job.org). O agendamento do GitHub
+fica só como reserva (1 vez por hora).
+
+Configuração do cronjob:
+
+- **URL:** `https://api.github.com/repos/ArthurZR/WhaleRadar/actions/workflows/radar.yml/dispatches`
+- **Método:** `POST` — **corpo:** `{"ref":"main"}`
+- **Cabeçalhos:** `Authorization: Bearer <token>`, `Accept: application/vnd.github+json`,
+  `X-GitHub-Api-Version: 2022-11-28`, `Content-Type: application/json`
+- **Token:** fine-grained, só no repositório WhaleRadar, permissão **Actions: Read and write**.
+
+⚠️ O token tem validade. Quando vencer, o cron-job.org passa a receber erro 401:
+gere outro em <https://github.com/settings/personal-access-tokens> ("Regenerate token")
+e cole no cabeçalho `Authorization`.
