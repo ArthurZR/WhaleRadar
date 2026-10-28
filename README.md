@@ -72,3 +72,18 @@ Configuração do cronjob:
 ⚠️ O token tem validade. Quando vencer, o cron-job.org passa a receber erro 401:
 gere outro em <https://github.com/settings/personal-access-tokens> ("Regenerate token")
 e cole no cabeçalho `Authorization`.
+
+## O que o bot faz hoje
+
+- **Alertas de queda e de alta** de BTC, ETH e SOL, com "por quê", notícia e termômetro de compra.
+- **Radar** das outras moedas grandes: só movimentos bem fortes, numa mensagem só (🛰️).
+- **Resumo diário** às 9h (horário de Brasília).
+- **Painel visual:** <https://arthurzr.github.io/WhaleRadar/> (atualiza a cada hora; preços ao vivo enquanto a página está aberta).
+
+Botões úteis em **Actions → Radar → Run workflow**:
+
+- **Mandar mensagem de teste** – preços atuais na hora.
+- **Atualizar o painel agora** – sem esperar a próxima hora.
+- **Mandar um resumo agora** – o das 9h continua saindo normalmente.
+
+E em **Actions → Backtest → Run workflow**: testa as regras do `config.yaml` nos últimos anos.
