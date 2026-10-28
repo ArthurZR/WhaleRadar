@@ -58,16 +58,16 @@ whaleradar/
 
 ## Checklist da Fase 0
 
-1. [ ] Criar o bot no Telegram com o @BotFather e guardar o token
-2. [ ] Descobrir o chat ID do usuário (mandar mensagem ao bot e consultar `getUpdates`)
-3. [ ] Criar o repositório `whaleradar` no GitHub
-4. [ ] Adicionar `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID` em GitHub Secrets
-5. [ ] Criar a estrutura de pastas e arquivos acima
-6. [ ] Implementar `prices.py` (preço BTC/ETH/SOL em USD e BRL via CoinGecko)
-7. [ ] Implementar `telegram_bot.py` (enviar mensagem de texto)
-8. [ ] `main.py` envia uma mensagem de teste com os preços atuais
-9. [ ] Criar `.github/workflows/radar.yml` com agendamento (cron) e execução manual
-10. [ ] Confirmar que a mensagem chega no Telegram, tanto local quanto pelo GitHub Actions
+1. [x] Criar o bot no Telegram com o @BotFather e guardar o token
+2. [x] Descobrir o chat ID do usuário (mandar mensagem ao bot e consultar `getUpdates`)
+3. [x] Criar o repositório `whaleradar` no GitHub
+4. [x] Adicionar `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID` em GitHub Secrets
+5. [x] Criar a estrutura de pastas e arquivos acima
+6. [x] Implementar `prices.py` (preço BTC/ETH/SOL em USD e BRL via CoinGecko)
+7. [x] Implementar `telegram_bot.py` (enviar mensagem de texto)
+8. [x] `main.py` envia uma mensagem de teste com os preços atuais
+9. [x] Criar `.github/workflows/radar.yml` com agendamento (cron) e execução manual
+10. [~] Confirmar que a mensagem chega no Telegram, tanto local quanto pelo GitHub Actions (Actions manual: ok em 28/10/2026; falta: execução agendada e teste local, que precisa do Python instalado)
 
 **Critério de pronto da Fase 0:** o GitHub Actions roda sozinho e o Telegram recebe uma mensagem com os preços de BTC, ETH e SOL.
 
